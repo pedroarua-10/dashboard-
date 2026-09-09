@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard de Pendências Operacionais</title>
+<style>
+:root{--bg:#0f1117;--surface:#1a1d27;--surface2:#22263a;--border:rgba(255,255,255,0.08);--text:#e8eaf0;--muted:#8890a8;--accent:#4f7cff;--alert:#ff4d4d;--alert-bg:rgba(255,77,77,0.12);--warn:#f0a500;--warn-bg:rgba(240,165,0,0.12);--ok:#2ecc71;--ok-bg:rgba(46,204,113,0.1);--teal:#00c8b8;--purple:#9b59b6;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;font-size:13px;min-height:100vh;}
+.header{padding:18px 24px 0;border-bottom:1px solid var(--border);}
+.header h1{font-size:17px;font-weight:600;letter-spacing:-.3px;}
+.header p{font-size:12px;color:var(--muted);margin-top:2px;margin-bottom:14px;}
+.tabs{display:flex;gap:2px;padding:0 24px;background:var(--surface);border-bottom:1px solid var(--border);}
+.tab{padding:11px 18px;cursor:pointer;font-size:12px;font-weight:500;color:var(--muted);border-bottom:2px solid transparent;transition:all .15s;white-space:nowrap;}
+.tab:hover{color:var(--text);}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent);}
+.tab .cnt{display:inline-block;background:var(--surface2);color:var(--muted);font-size:10px;padding:1px 6px;border-radius:10px;margin-left:6px;}
+.tab.active .cnt{background:rgba(79,124,255,.2);color:var(--accent);}
+.panel{display:none;padding:16px 24px 24px;}
+.panel.active{display:block;}
+/* SUMMARY */
+.summary{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;}
+.scard{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px 16px;flex:1;min-width:120px;}
+.scard .val{font-size:22px;font-weight:700;line-height:1;}
+.scard .lbl{font-size:11px;color:var(--muted);margin-top:4px;}
+.scard.red .val{color:var(--alert);}
+.scard.grn .val{color:var(--ok);}
+.scard.ylw .val{color:var(--warn);}
+.scard.blu .val{color:var(--accent);}
+/* TOOLBAR */
+.toolbar{display:flex;align-items:flex-start;gap:10px;margin-bottom:14px;flex-wrap:wrap;}
+.toolbar input[type=text]{background:var(--surface);border:1px solid var(--border);color:var(--text);padding:7px 12px;border-radius:6px;font-size:12px;outline:none;width:210px;}
+.toolbar input[type=text]:focus{border-color:var(--accent);}
+/* MULTI-SELECT */
+.ms-wrap{position:relative;display:inline-block;}
+.ms-trigger{display:flex;align-items:center;justify-content:space-between;gap:6px;background:var(--surface);border:1px solid var(--border);color:var(--text);padding:7px 10px 7px 12px;border-radius:6px;font-size:12px;cursor:pointer;min-width:200px;max-width:240px;user-select:none;}
+.ms-trigger .ms-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;}
+.ms-trigger .ms-arrow{color:var(--muted);font-size:10px;flex-shrink:0;transition:transform .15s;}
+.ms-trigger.open{border-color:var(--accent);}
+.ms-trigger.open .ms-arrow{transform:rotate(180deg);}
+.ms-badge{background:rgba(79,124,255,.25);color:var(--accent);font-size:10px;padding:1px 6px;border-radius:10px;font-weight:600;flex-shrink:0;}
+.ms-dropdown{position:absolute;top:calc(100% + 4px);left:0;background:var(--surface2);border:1px solid var(--border);border-radius:8px;min-width:250px;max-height:260px;z-index:200;box-shadow:0 8px 24px rgba(0,0,0,.5);display:flex;flex-direction:column;}
+.ms-dropdown.hidden{display:none;}
+.ms-head{padding:8px 10px 6px;border-bottom:1px solid var(--border);flex-shrink:0;}
+.ms-head input{width:100%;background:var(--surface);border:1px solid var(--border);color:var(--text);padding:5px 8px;border-radius:5px;font-size:12px;outline:none;}
+.ms-head input:focus{border-color:var(--accent);}
+.ms-actions{display:flex;gap:8px;padding:5px 10px;border-bottom:1px solid var(--border);flex-shrink:0;}
+.ms-act{font-size:11px;color:var(--accent);cursor:pointer;}
+.ms-act:hover{text-decoration:underline;}
+.ms-list{overflow-y:auto;flex:1;}
+.ms-item{display:flex;align-items:center;gap:8px;padding:7px 12px;cursor:pointer;}
+.ms-item:hover{background:rgba(255,255,255,.04);}
+.ms-item input[type=checkbox]{accent-color:var(--accent);width:13px;height:13px;cursor:pointer;flex-shrink:0;}
+.ms-item label{cursor:pointer;font-size:12px;color:var(--text);flex:1;line-height:1.3;}
+/* ALERT PILL */
+.pill{font-size:11px;padding:5px 12px;border-radius:20px;font-weight:500;cursor:pointer;border:1px solid transparent;transition:all .12s;white-space:nowrap;align-self:flex-start;margin-top:1px;}
+.pill-alert{background:var(--alert-bg);color:var(--alert);border-color:rgba(255,77,77,.2);}
+.pill-alert.on{background:var(--alert);color:#fff;}
+.info-bar{margin-left:auto;font-size:11px;color:var(--muted);align-self:center;}
+/* TABLE */
+.tbl-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:8px;}
+table{width:100%;border-collapse:collapse;}
+th{background:var(--surface2);color:var(--muted);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;padding:9px 12px;text-align:left;cursor:pointer;white-space:nowrap;user-select:none;}
+th:hover{color:var(--text);}
+th.sorted{color:var(--accent);}
+td{padding:9px 12px;border-top:1px solid var(--border);vertical-align:middle;}
+tr:hover td{background:rgba(255,255,255,.03);}
+tr.row-alert td{background:var(--alert-bg)!important;}
+tr.row-alert:hover td{background:rgba(255,77,77,.18)!important;}
+.tat-badge{display:inline-block;padding:2px 8px;border-radius:12px;font-weight:600;font-size:12px;}
+.tat-over{background:var(--alert-bg);color:var(--alert);border:1px solid rgba(255,77,77,.3);}
+.tat-warn{background:var(--warn-bg);color:var(--warn);border:1px solid rgba(240,165,0,.3);}
+.tat-ok{background:var(--ok-bg);color:var(--ok);border:1px solid rgba(46,204,113,.2);}
+.pulse{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--alert);margin-right:6px;animation:pulse 1.5s ease-in-out infinite;}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.no-results{text-align:center;padding:40px;color:var(--muted);}
+/* PAGINATION */
+.pag{display:flex;align-items:center;gap:6px;margin-top:12px;justify-content:flex-end;}
+.pb{background:var(--surface);border:1px solid var(--border);color:var(--text);padding:5px 10px;border-radius:5px;cursor:pointer;font-size:12px;}
+.pb:hover{border-color:var(--accent);}
+.pb.on{background:var(--accent);border-color:var(--accent);color:#fff;}
+.pi{font-size:11px;color:var(--muted);padding:0 4px;}
+/* INDICADORES */
+.ind-filters{display:flex;gap:10px;margin-bottom:18px;flex-wrap:wrap;align-items:flex-start;}
+.chart-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+@media(max-width:620px){.chart-grid{grid-template-columns:1fr;}}
+.chart-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px;}
+.chart-card h3{font-size:13px;font-weight:600;margin-bottom:3px;}
+.chart-card .sub{font-size:11px;color:var(--muted);margin-bottom:18px;}
+.bar-row{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+.bar-label{font-size:12px;width:130px;flex-shrink:0;}
+.bar-track{flex:1;height:8px;background:var(--surface2);border-radius:4px;overflow:hidden;}
+.bar-fill{height:100%;border-radius:4px;transition:width .5s cubic-bezier(.4,0,.2,1);}
+.bar-val{font-size:12px;font-weight:600;width:44px;text-align:right;color:var(--muted);}
+.bar-pct{font-size:11px;color:var(--muted);width:34px;text-align:right;}
+.donut-wrap{position:relative;width:150px;height:150px;margin:0 auto 16px;}
+.donut-wrap svg{width:100%;height:100%;}
+.donut-center{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;}
+.donut-center .big{font-size:24px;font-weight:700;}
+.donut-center .sm{font-size:10px;color:var(--muted);}
+.leg-row{display:flex;align-items:center;gap:8px;margin-bottom:7px;}
+.leg-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
+.leg-lbl{font-size:12px;color:var(--muted);flex:1;}
+.leg-val{font-size:12px;font-weight:600;}
+.leg-pct{font-size:11px;color:var(--muted);width:34px;text-align:right;}
+.wide-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px;margin-top:16px;}
+.wide-card h3{font-size:13px;font-weight:600;margin-bottom:3px;}
+.wide-card .sub{font-size:11px;color:var(--muted);margin-bottom:16px;}
+.filter-label{font-size:11px;color:var(--muted);margin-bottom:5px;}
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>Dashboard de Pendências Operacionais</h1>
+  <p>Base: 23/02/2026 – 22/06/2026 · 2554 OS · Atualizado em 22/06/2026 às 23:15</p>
+</div>
+
+<div class="tabs">
+  <div class="tab" data-panel="panel-as">Aguar. Serviço <span class="cnt" id="cnt-as">93</span></div>
+  <div class="tab" data-panel="panel-aa">Aguar. Aprov. <span class="cnt" id="cnt-aa">238</span></div>
+  <div class="tab" data-panel="panel-ad">Aguar. Distribuição <span class="cnt" id="cnt-ad">114</span></div>
+  <div class="tab" data-panel="panel-ind">Indicadores de Desempenho</div>
+</div>
+
+<!-- PANEL: AGUAR. SERVIÇO -->
+<div id="panel-as" class="panel">
+  <div class="summary" id="sum-as"></div>
+  <div class="toolbar">
+    <input type="text" id="q-as" placeholder="Buscar O.S., modelo, garantia..." oninput="renderTab('as')">
+    <div class="ms-wrap">
+      <div class="ms-trigger" id="trig-as" onclick="toggleMs('dd-as')">
+        <span class="ms-label">Todos os tipos de garantia</span><span class="ms-arrow">▾</span>
+      </div>
+      <div class="ms-dropdown hidden" id="dd-as">
+        <div class="ms-head"><input type="text" placeholder="Buscar garantia..." oninput="filterMsItems('list-as',this.value)"></div>
+        <div class="ms-actions">
+          <span class="ms-act" onclick="msSelAll('as')">Sel. tudo</span>
+          <span style="color:var(--muted)">·</span>
+          <span class="ms-act" onclick="msClearAll('as')">Limpar</span>
+        </div>
+        <div class="ms-list" id="list-as"></div>
+      </div>
+    </div>
+    <span class="pill pill-alert" id="pill-as" onclick="toggleAlert('as')">⚠ Apenas alertas</span>
+    <span class="info-bar" id="info-as"></span>
+  </div>
+  <div class="tbl-wrap"><table>
+    <thead><tr>
+      <th onclick="sortTab('as','os')" id="th-as-os">O.S. <span>↕</span></th>
+      <th onclick="sortTab('as','modelo')" id="th-as-modelo">Modelo <span>↕</span></th>
+      <th onclick="sortTab('as','uf')" id="th-as-uf">UF <span>↕</span></th>
+      <th onclick="sortTab('as','tat')" id="th-as-tat">TAT (dias) <span>↓</span></th>
+      <th onclick="sortTab('as','tipo_garantia')" id="th-as-tipo_garantia">Tipo de Garantia <span>↕</span></th>
+      <th onclick="sortTab('as','itens')" id="th-as-itens">Itens Orç. Garantia <span>↕</span></th>
+    </tr></thead>
+    <tbody id="tb-as"></tbody>
+  </table></div>
+  <div class="pag" id="pag-as"></div>
+</div>
+
+<!-- PANEL: AGUAR. APROV. -->
+<div id="panel-aa" class="panel">
+  <div class="summary" id="sum-aa"></div>
+  <div class="toolbar">
+    <input type="text" id="q-aa" placeholder="Buscar O.S., modelo, garantia..." oninput="renderTab('aa')">
+    <div class="ms-wrap">
+      <div class="ms-trigger" id="trig-aa" onclick="toggleMs('dd-aa')">
+        <span class="ms-label">Todos os tipos de garantia</span><span class="ms-arrow">▾</span>
+      </div>
+      <div class="ms-dropdown hidden" id="dd-aa">
+        <div class="ms-head"><input type="text" placeholder="Buscar garantia..." oninput="filterMsItems('list-aa',this.value)"></div>
+        <div class="ms-actions">
+          <span class="ms-act" onclick="msSelAll('aa')">Sel. tudo</span>
+          <span style="color:var(--muted)">·</span>
+          <span class="ms-act" onclick="msClearAll('aa')">Limpar</span>
+        </div>
+        <div class="ms-list" id="list-aa"></div>
+      </div>
+    </div>
+    <span class="pill pill-alert" id="pill-aa" onclick="toggleAlert('aa')">⚠ Apenas alertas</span>
+    <span class="info-bar" id="info-aa"></span>
+  </div>
+  <div class="tbl-wrap"><table>
+    <thead><tr>
+      <th onclick="sortTab('aa','os')" id="th-aa-os">O.S. <span>↕</span></th>
+      <th onclick="sortTab('aa','modelo')" id="th-aa-modelo">Modelo <span>↕</span></th>
+      <th onclick="sortTab('aa','uf')" id="th-aa-uf">UF <span>↕</span></th>
+      <th onclick="sortTab('aa','tat')" id="th-aa-tat">TAT (dias) <span>↓</span></th>
+      <th onclick="sortTab('aa','tipo_garantia')" id="th-aa-tipo_garantia">Tipo de Garantia <span>↕</span></th>
+      <th onclick="sortTab('aa','itens')" id="th-aa-itens">Itens Orç. Garantia <span>↕</span></th>
+    </tr></thead>
+    <tbody id="tb-aa"></tbody>
+  </table></div>
+  <div class="pag" id="pag-aa"></div>
+</div>
+
+<!-- PANEL: AGUAR. DISTRIBUIÇÃO -->
+<div id="panel-ad" class="panel">
+  <div class="summary" id="sum-ad"></div>
+  <div class="toolbar">
+    <input type="text" id="q-ad" placeholder="Buscar O.S., modelo, garantia..." oninput="renderTab('ad')">
+    <div class="ms-wrap">
+      <div class="ms-trigger" id="trig-ad" onclick="toggleMs('dd-ad')">
+        <span class="ms-label">Todos os tipos de garantia</span><span class="ms-arrow">▾</span>
+      </div>
+      <div class="ms-dropdown hidden" id="dd-ad">
+        <div class="ms-head"><input type="text" placeholder="Buscar garantia..." oninput="filterMsItems('list-ad',this.value)"></div>
+        <div class="ms-actions">
+          <span class="ms-act" onclick="msSelAll('ad')">Sel. tudo</span>
+          <span style="color:var(--muted)">·</span>
+          <span class="ms-act" onclick="msClearAll('ad')">Limpar</span>
+        </div>
+        <div class="ms-list" id="list-ad"></div>
+      </div>
+    </div>
+    <span class="pill pill-alert" id="pill-ad" onclick="toggleAlert('ad')">⚠ Apenas alertas</span>
+    <span class="info-bar" id="info-ad"></span>
+  </div>
+  <div class="tbl-wrap"><table>
+    <thead><tr>
+      <th onclick="sortTab('ad','os')" id="th-ad-os">O.S. <span>↕</span></th>
+      <th onclick="sortTab('ad','modelo')" id="th-ad-modelo">Modelo <span>↕</span></th>
+      <th onclick="sortTab('ad','uf')" id="th-ad-uf">UF <span>↕</span></th>
+      <th onclick="sortTab('ad','tat')" id="th-ad-tat">TAT (dias) <span>↓</span></th>
+      <th onclick="sortTab('ad','tipo_garantia')" id="th-ad-tipo_garantia">Tipo de Garantia <span>↕</span></th>
+      <th onclick="sortTab('ad','dt_visita')" id="th-ad-dt_visita">Dt. Visita <span>↕</span></th>
+      <th onclick="sortTab('ad','tec_visita')" id="th-ad-tec_visita">Téc. Visita <span>↕</span></th>
+    </tr></thead>
+    <tbody id="tb-ad"></tbody>
+  </table></div>
+  <div class="pag" id="pag-ad"></div>
+</div>
+
+<!-- PANEL: INDICADORES -->
+<div id="panel-ind" class="panel">
+  <div class="ind-filters">
+    <div>
+      <div class="filter-label">Período (mês)</div>
+      <div class="ms-wrap">
+        <div class="ms-trigger" id="trig-mes" onclick="toggleMs('dd-mes')">
+          <span class="ms-label">Todos os meses</span><span class="ms-arrow">▾</span>
+        </div>
+        <div class="ms-dropdown hidden" id="dd-mes">
+          <div class="ms-head"><input type="text" placeholder="Buscar mês..." oninput="filterMsItems('list-mes',this.value)"></div>
+          <div class="ms-actions">
+            <span class="ms-act" onclick="msSelAll('mes')">Sel. tudo</span>
+            <span style="color:var(--muted)">·</span>
+            <span class="ms-act" onclick="msClearAll('mes')">Limpar</span>
+          </div>
+          <div class="ms-list" id="list-mes"></div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="filter-label">Tipo de Garantia</div>
+      <div class="ms-wrap">
+        <div class="ms-trigger" id="trig-indgar" onclick="toggleMs('dd-indgar')">
+          <span class="ms-label">Todos os tipos de garantia</span><span class="ms-arrow">▾</span>
+        </div>
+        <div class="ms-dropdown hidden" id="dd-indgar">
+          <div class="ms-head"><input type="text" placeholder="Buscar garantia..." oninput="filterMsItems('list-indgar',this.value)"></div>
+          <div class="ms-actions">
+            <span class="ms-act" onclick="msSelAll('indgar')">Sel. tudo</span>
+            <span style="color:var(--muted)">·</span>
+            <span class="ms-act" onclick="msClearAll('indgar')">Limpar</span>
+          </div>
+          <div class="ms-list" id="list-indgar"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="chart-grid">
+    <div class="chart-card">
+      <h3>Distribuição de Desfechos</h3>
+      <p class="sub" id="ch-sub">—</p>
+      <div class="donut-wrap"><svg id="donut-svg" viewBox="0 0 150 150"></svg>
+        <div class="donut-center"><div class="big" id="donut-tot">—</div><div class="sm">OS</div></div>
+      </div>
+      <div id="donut-leg"></div>
+    </div>
+    <div class="chart-card">
+      <h3>Volume por Desfecho</h3>
+      <p class="sub" id="ch-sub2">—</p>
+      <div id="bar-chart"></div>
+    </div>
+  </div>
+  <div class="wide-card">
+    <h3>Resumo Executivo</h3>
+    <p class="sub" id="kpi-sub">—</p>
+    <div id="kpi-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;"></div>
+  </div>
+</div>
+
+<script>
+// ─── DADOS ────────────────────────────────────────────────────────────────────
+const AS=[{"os":"968034","modelo":"58PUG7019/78","uf":"PR","tat":116,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968074","modelo":"43P755","uf":"PR","tat":115,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968100","modelo":"32S5045/78G","uf":"PR","tat":114,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968120","modelo":"32R6610","uf":"PR","tat":114,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968161","modelo":"PTV32E21DSWN","uf":"PR","tat":112,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968184","modelo":"TAX5509/78","uf":"PR","tat":111,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968200","modelo":"C311WDW","uf":"PR","tat":111,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968201","modelo":"C311WDS","uf":"PR","tat":111,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968458","modelo":"MS3043BR","uf":"PR","tat":101,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968584","modelo":"32LB560B","uf":"PR","tat":96,"tipo_garantia":"FORA DA GARANTIA","itens":""},{"os":"968694","modelo":"32S615","uf":"PR","tat":91,"tipo_garantia":"FORA DA GARANTIA","itens":""},{"os":"968874","modelo":"43S5K","uf":"PR","tat":83,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968941","modelo":"50P7K","uf":"PR","tat":82,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"969157","modelo":"L43S4900FS","uf":"PR","tat":70,"tipo_garantia":"FORA DA GARANTIA","itens":""},{"os":"969228","modelo":"CM550","uf":"PR","tat":66,"tipo_garantia":"Fora da Garantia","itens":""},{"os":"969289","modelo":"43P755","uf":"PR","tat":60,"tipo_garantia":"FORA DA GARANTIA","itens":""},{"os":"969470","modelo":"65C715","uf":"PR","tat":49,"tipo_garantia":"FORA DA GARANTIA","itens":""},{"os":"969604","modelo":"DL3253W","uf":"PR","tat":42,"tipo_garantia":"FORA DA GARANTIA","itens":""},{"os":"969733","modelo":"PCX24000","uf":"PR","tat":35,"tipo_garantia":"GARANTIA - ZURICH","itens":"PLACA PRINCIPAL"},{"os":"969766","modelo":"UN50NU7100GXZD","uf":"PR","tat":34,"tipo_garantia":"FORA DA GARANTIA","itens":""},{"os":"969927","modelo":"50PUG7300/78","uf":"PR","tat":25,"tipo_garantia":"Garantia Fábrica - TPV","itens":""},{"os":"969958","modelo":"50U7045/78G","uf":"PR","tat":24,"tipo_garantia":"GARANTIA FÁBRICA - TPV","itens":""},{"os":"970039","modelo":"43PFG6918/78","uf":"PR","tat":19,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"970040","modelo":"43PFG6910/78","uf":"PR","tat":19,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"970049","modelo":"27G4/P/57","uf":"PR","tat":19,"tipo_garantia":"GARANTIA FÁBRICA - TPV","itens":""},{"os":"970076","modelo":"75P7K","uf":"PR","tat":19,"tipo_garantia":"GARANTIA FABRICA - TCL","itens":""},{"os":"970079","modelo":"50PUG7019/78","uf":"PR","tat":19,"tipo_garantia":"GARANTIA FÁBRICA - TPV","itens":""},{"os":"970084","modelo":"43PFG6918/78","uf":"PR","tat":18,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"970091","modelo":"43S5045/78G","uf":"PR","tat":18,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"970108","modelo":"PBS220BT","uf":"PR","tat":17,"tipo_garantia":"GARANTIA - ZURICH","itens":"PLACA ANPLIFICADORA"},{"os":"970112","modelo":"43PFG6918/78","uf":"PR","tat":17,"tipo_garantia":"GARANTIA FÁBRICA - TPV","itens":""},{"os":"970113","modelo":"43S5045/78G","uf":"PR","tat":17,"tipo_garantia":"GARANTIA FÁBRICA - TPV","itens":""},{"os":"970114","modelo":"40S5045/78G","uf":"PR","tat":17,"tipo_garantia":"GARANTIA FÁBRICA - TPV","itens":""},{"os":"970115","modelo":"50U7045/78G","uf":"PR","tat":17,"tipo_garantia":"GARANTIA FÁBRICA - TPV","itens":""},{"os":"970123","modelo":"65PUG7419/78","uf":"PR","tat":17,"tipo_garantia":"GARANTIA FÁBRICA - TPV","itens":""},{"os":"970131","modelo":"32S42","uf":"PR","tat":17,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"970134","modelo":"50P7K","uf":"PR","tat":17,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"970149","modelo":"50S62","uf":"PR","tat":14,"tipo_garantia":"GARANTIA FABRICA - TCL","itens":""},{"os":"970151","modelo":"75P7K","uf":"PR","tat":14,"tipo_garantia":"GARANTIA FABRICA - TCL","itens":""},{"os":"970158","modelo":"TAX5509/78","uf":"PR","tat":14,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"970161","modelo":"AWS-T2W-02","uf":"PR","tat":14,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"970195","modelo":"65P7K","uf":"PR","tat":13,"tipo_garantia":"GARANTIA FABRICA - TCL","itens":""},{"os":"970196","modelo":"55C6K","uf":"PR","tat":13,"tipo_garantia":"GARANTIA FABRICA - TCL","itens":""},{"os":"970199","modelo":"50PUG7408/78","uf":"PR","tat":13,"tipo_garantia":"GARANTIA FÁBRICA - TPV","itens":""},{"os":"970200","modelo":"50PUG7019/78","uf":"PR","tat":13,"tipo_garantia":"GARANTIA FÁBRICA - TPV","itens":""},{"os":"970201","modelo":"32PHG6909/78","uf":"PR","tat":13,"tipo_garantia":"GARANTIA FÁBRICA - TPV","itens":""},{"os":"970202","modelo":"32PHG6909/78","uf":"PR","tat":13,"tipo_garantia":"GARANTIA FÁBRICA - TPV","itens":""},{"os":"970216","modelo":"LE3278I","uf":"PR","tat":13,"tipo_garantia":"FORA DA GARANTIA","itens":""},{"os":"970218","modelo":"43S5K","uf":"PR","tat":13,"tipo_garantia":"GARANTIA FABRICA - TCL","itens":""},{"os":"970222","modelo":"75P7K","uf":"PR","tat":12,"tipo_garantia":"GARANTIA FABRICA - TCL","itens":""},{"os":"970224","modelo":"50PUG7019/78","uf":"PR","tat":12,"tipo_garantia":"GARANTIA FÁBRICA - TPV","itens":""},{"os":"970225","modelo":"43PFG6909/78","uf":"PR","tat":12,"tipo_garantia":"GARANTIA FÁBRICA - TPV","itens":""},{"os":"970226","modelo":"75PUG7906/78","uf":"PR","tat":12,"tipo_garantia":"GARANTIA FÁBRICA - TPV","itens":""},{"os":"970244","modelo":"75PUG7019/78","uf":"PR","tat":11,"tipo_garantia":"GARANTIA FÁBRICA - TPV","itens":""},{"os":"970249","modelo":"50U6125/78G","uf":"PR","tat":11,"tipo_garantia":"GARANTIA FÁBRICA - TPV","itens":""},{"os":"970251","modelo":"43S5045/78G","uf":"PR","tat":11,"tipo_garantia":"GARANTIA FÁBRICA - TPV","itens":""},{"os":"970255","modelo":"32PHG6909/78","uf":"PR","tat":11,"tipo_garantia":"Garantia Fábrica - TPV","itens":""},{"os":"970256","modelo":"55S62","uf":"PR","tat":11,"tipo_garantia":"GARANTIA FABRICA - TCL","itens":""},{"os":"970257","modelo":"50P7K","uf":"PR","tat":11,"tipo_garantia":"GARANTIA FABRICA - TCL","itens":""},{"os":"970263","modelo":"AWS-HP-04-B","uf":"RS","tat":11,"tipo_garantia":"GARANTIA FABRICA - AIWA","itens":""},{"os":"970271","modelo":"55P7K","uf":"PR","tat":11,"tipo_garantia":"GARANTIA FABRICA - TCL","itens":""},{"os":"970273","modelo":"55P7K","uf":"PR","tat":11,"tipo_garantia":"GARANTIA FABRICA - TCL","itens":""},{"os":"970275","modelo":"32S42","uf":"PR","tat":10,"tipo_garantia":"GARANTIA FABRICA - TCL","itens":""},{"os":"970276","modelo":"98C6K","uf":"PR","tat":10,"tipo_garantia":"GARANTIA FABRICA - TCL","itens":""},{"os":"970277","modelo":"55S62","uf":"PR","tat":10,"tipo_garantia":"GARANTIA FABRICA - TCL","itens":""},{"os":"970299","modelo":"50PUG7019/78","uf":"PR","tat":7,"tipo_garantia":"GARANTIA FÁBRICA - TPV","itens":""},{"os":"970300","modelo":"E970SWHNL","uf":"PR","tat":7,"tipo_garantia":"GARANTIA FÁBRICA - TPV","itens":""},{"os":"970301","modelo":"E970SWNL","uf":"PR","tat":7,"tipo_garantia":"GARANTIA FÁBRICA - TPV","itens":""},{"os":"970302","modelo":"42S5045/78","uf":"PR","tat":7,"tipo_garantia":"GARANTIA FÁBRICA - TPV","itens":""},{"os":"970303","modelo":"55S62","uf":"PR","tat":7,"tipo_garantia":"GARANTIA FABRICA - TCL","itens":""},{"os":"970306","modelo":"55P7K","uf":"PR","tat":7,"tipo_garantia":"GARANTIA FABRICA - TCL","itens":""},{"os":"970309","modelo":"50P7K","uf":"PR","tat":7,"tipo_garantia":"GARANTIA FABRICA - TCL","itens":""},{"os":"970314","modelo":"50P7K","uf":"PR","tat":7,"tipo_garantia":"GARANTIA FABRICA - TCL","itens":""},{"os":"970334","modelo":"43S5045/78G","uf":"PR","tat":6,"tipo_garantia":"GARANTIA FÁBRICA - TPV","itens":""},{"os":"970338","modelo":"43PFG6918/78","uf":"PR","tat":6,"tipo_garantia":"GARANTIA FÁBRICA - TPV","itens":""},{"os":"970340","modelo":"75P7K","uf":"PR","tat":6,"tipo_garantia":"GARANTIA FABRICA - TCL","itens":""},{"os":"970341","modelo":"32S5400AF","uf":"PR","tat":6,"tipo_garantia":"GARANTIA FABRICA - TCL","itens":""},{"os":"970342","modelo":"50C6KS","uf":"PR","tat":6,"tipo_garantia":"GARANTIA FABRICA - TCL","itens":""},{"os":"970343","modelo":"50P7K","uf":"PR","tat":6,"tipo_garantia":"GARANTIA FABRICA - TCL","itens":""},{"os":"970348","modelo":"55P7K","uf":"PR","tat":6,"tipo_garantia":"GARANTIA FABRICA - TCL","itens":""},{"os":"970350","modelo":"32PHG6909/78","uf":"PR","tat":6,"tipo_garantia":"GARANTIA FÁBRICA - TPV","itens":""},{"os":"970352","modelo":"50PUG7019/78","uf":"PR","tat":6,"tipo_garantia":"GARANTIA FÁBRICA - TPV","itens":""},{"os":"970354","modelo":"55P7K","uf":"PR","tat":6,"tipo_garantia":"GARANTIA FABRICA - TCL","itens":""},{"os":"970355","modelo":"55P7K","uf":"PR","tat":6,"tipo_garantia":"GARANTIA FABRICA - TCL","itens":""},{"os":"970356","modelo":"55P8K","uf":"PR","tat":6,"tipo_garantia":"GARANTIA FABRICA - TCL","itens":""},{"os":"970373","modelo":"32PHG6909/78","uf":"PR","tat":5,"tipo_garantia":"GARANTIA FÁBRICA - TPV","itens":""},{"os":"970376","modelo":"43PFG6918/78","uf":"PR","tat":5,"tipo_garantia":"GARANTIA FÁBRICA - TPV","itens":""},{"os":"970377","modelo":"65PUG7019/78","uf":"PR","tat":5,"tipo_garantia":"GARANTIA FÁBRICA - TPV","itens":""},{"os":"970394","modelo":"75P7K","uf":"PR","tat":4,"tipo_garantia":"GARANTIA FABRICA - TCL","itens":""},{"os":"970396","modelo":"50P7K","uf":"PR","tat":4,"tipo_garantia":"GARANTIA FABRICA - TCL","itens":""},{"os":"970432","modelo":"42S5045/78","uf":"PR","tat":3,"tipo_garantia":"Garantia Fábrica - TPV","itens":""},{"os":"970441","modelo":"50P7K","uf":"PR","tat":3,"tipo_garantia":"GARANTIA FABRICA - TCL","itens":""},{"os":"970442","modelo":"50P7K","uf":"PR","tat":3,"tipo_garantia":"GARANTIA FABRICA - TCL","itens":""}];
+const AA=[{"os":"968073","modelo":"43S5045/78","uf":"PR","tat":115,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968077","modelo":"AWS-BBS-01-B","uf":"PR","tat":115,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968103","modelo":"32R6610","uf":"PR","tat":114,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968110","modelo":"32S5135/78G","uf":"PR","tat":114,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968121","modelo":"50U7045/78G","uf":"PR","tat":114,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968122","modelo":"50U7045/78G","uf":"PR","tat":114,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968123","modelo":"43PFG6918/78","uf":"PR","tat":114,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968127","modelo":"58PUG7019/78","uf":"PR","tat":114,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968128","modelo":"50P7K","uf":"PR","tat":114,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968140","modelo":"CQ32G4E/57","uf":"PR","tat":112,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968146","modelo":"27B35H/57","uf":"PR","tat":112,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968151","modelo":"PTV24G50SN","uf":"PR","tat":112,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968164","modelo":"BTV40E3AAGSSGBL","uf":"PR","tat":112,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968170","modelo":"PTV43G50SN","uf":"PR","tat":112,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968183","modelo":"TAX5509/78","uf":"PR","tat":111,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968192","modelo":"TAX5509/78","uf":"PR","tat":111,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968193","modelo":"GC-B569NLL2","uf":"PR","tat":111,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968194","modelo":"MS3043BR","uf":"PR","tat":111,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968195","modelo":"MS3043BR","uf":"PR","tat":111,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968198","modelo":"CV5014PC4","uf":"PR","tat":111,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968199","modelo":"C311WDW1","uf":"PR","tat":111,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968202","modelo":"MS3033DS","uf":"PR","tat":111,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968213","modelo":"C311WDW","uf":"PR","tat":110,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968214","modelo":"65S62","uf":"PR","tat":110,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968215","modelo":"65P7K","uf":"PR","tat":110,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968216","modelo":"65C6K","uf":"PR","tat":110,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968217","modelo":"43S5K","uf":"PR","tat":110,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968218","modelo":"43S5K","uf":"PR","tat":110,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968219","modelo":"43S5K","uf":"PR","tat":110,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968223","modelo":"40S5K","uf":"PR","tat":110,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968225","modelo":"40S5K","uf":"PR","tat":110,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968226","modelo":"43S42","uf":"PR","tat":110,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968229","modelo":"43RS520","uf":"PR","tat":110,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968232","modelo":"32S42","uf":"PR","tat":110,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968233","modelo":"32S42","uf":"PR","tat":110,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968234","modelo":"32S42","uf":"PR","tat":110,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968235","modelo":"32S42","uf":"PR","tat":110,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968238","modelo":"32S42","uf":"PR","tat":110,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968240","modelo":"32S5400AF","uf":"PR","tat":110,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968241","modelo":"32S5400AF","uf":"PR","tat":110,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968242","modelo":"32S5K","uf":"PR","tat":110,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968247","modelo":"50RP620","uf":"PR","tat":110,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968248","modelo":"55P7K","uf":"PR","tat":110,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968249","modelo":"55P7K","uf":"PR","tat":110,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968250","modelo":"55P7K","uf":"PR","tat":110,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968251","modelo":"55P7K","uf":"PR","tat":110,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968252","modelo":"55P7K","uf":"PR","tat":110,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968254","modelo":"55P7K","uf":"PR","tat":110,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968255","modelo":"55P7K","uf":"PR","tat":110,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968256","modelo":"55P7K","uf":"PR","tat":110,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968257","modelo":"55P7K","uf":"PR","tat":110,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968259","modelo":"50P7K","uf":"PR","tat":110,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968264","modelo":"55C6K","uf":"PR","tat":110,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968265","modelo":"50P7K","uf":"PR","tat":110,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968268","modelo":"55S62","uf":"PR","tat":109,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968270","modelo":"55P755","uf":"PR","tat":109,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968273","modelo":"65P7K","uf":"PR","tat":109,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968274","modelo":"65P755","uf":"PR","tat":109,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968453","modelo":"CV5012PC4","uf":"PR","tat":101,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968455","modelo":"27G4/P/57","uf":"PR","tat":101,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968457","modelo":"CV5012PC4","uf":"PR","tat":101,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968459","modelo":"CV5014WC4","uf":"PR","tat":101,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968460","modelo":"C311WDW","uf":"PR","tat":101,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968461","modelo":"MS3033DS","uf":"PR","tat":101,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968462","modelo":"MS3033DS","uf":"PR","tat":101,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968477","modelo":"32S5045/78G","uf":"PR","tat":101,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968478","modelo":"50U7045/78G","uf":"PR","tat":101,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968480","modelo":"50U7045/78G","uf":"PR","tat":101,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968482","modelo":"50U7045/78G","uf":"PR","tat":101,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968484","modelo":"50U7045/78G","uf":"PR","tat":101,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968485","modelo":"50U7045/78G","uf":"PR","tat":101,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968489","modelo":"50U7045/78G","uf":"PR","tat":101,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968490","modelo":"50U7045/78G","uf":"PR","tat":101,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968492","modelo":"U34G4C/57","uf":"PR","tat":101,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968494","modelo":"27G4/P/57","uf":"PR","tat":101,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968495","modelo":"25G4S/P/57","uf":"PR","tat":101,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968498","modelo":"65P7K","uf":"PR","tat":101,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968499","modelo":"55S62","uf":"PR","tat":101,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968507","modelo":"32S42","uf":"PR","tat":101,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968599","modelo":"UN70DU7700GXZD","uf":"PR","tat":95,"tipo_garantia":"FORA DA GARANTIA","itens":""},{"os":"968689","modelo":"50S61","uf":"PR","tat":91,"tipo_garantia":"FORA DA GARANTIA","itens":""},{"os":"968848","modelo":"TAX5509/78","uf":"PR","tat":83,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968850","modelo":"AWS-T2W-02","uf":"PR","tat":83,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968861","modelo":"43PFG6918/78","uf":"PR","tat":83,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968870","modelo":"AWS-BBS-02-A","uf":"PR","tat":83,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968876","modelo":"32S42","uf":"PR","tat":83,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968881","modelo":"32S42","uf":"PR","tat":83,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968883","modelo":"32S42","uf":"PR","tat":83,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968885","modelo":"32S42","uf":"PR","tat":83,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968888","modelo":"40S5K","uf":"PR","tat":83,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968889","modelo":"40S5K","uf":"PR","tat":83,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968890","modelo":"43S5K","uf":"PR","tat":83,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968904","modelo":"40S5K","uf":"PR","tat":82,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968911","modelo":"43S5045/78G","uf":"PR","tat":82,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968912","modelo":"43S5045/78G","uf":"PR","tat":82,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968914","modelo":"43PFG6918/78","uf":"PR","tat":82,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968916","modelo":"43PFG6918/78","uf":"PR","tat":82,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968917","modelo":"43S42","uf":"PR","tat":82,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968918","modelo":"32S42","uf":"PR","tat":82,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968919","modelo":"32S5045/78G","uf":"PR","tat":82,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968928","modelo":"32S42","uf":"PR","tat":82,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968931","modelo":"43S5K","uf":"PR","tat":82,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968932","modelo":"43S42","uf":"PR","tat":82,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968934","modelo":"50P7K","uf":"PR","tat":82,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968935","modelo":"50U7045/78G","uf":"PR","tat":82,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968937","modelo":"50U7045/78G","uf":"PR","tat":82,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968948","modelo":"43S5400A","uf":"PR","tat":81,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968953","modelo":"70PUG7019/78","uf":"PR","tat":81,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968960","modelo":"55C6K","uf":"PR","tat":81,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968968","modelo":"55P7K","uf":"PR","tat":81,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968971","modelo":"50U7045/78G","uf":"PR","tat":81,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968972","modelo":"50U7045/78G","uf":"PR","tat":81,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968976","modelo":"22B35HM23/57","uf":"PR","tat":81,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968979","modelo":"24G4/P/57","uf":"PR","tat":81,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968981","modelo":"24G4/P/57","uf":"PR","tat":81,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968982","modelo":"24G4/P/57","uf":"PR","tat":81,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968984","modelo":"24G4/P/57","uf":"PR","tat":81,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"968985","modelo":"27G4/P/57","uf":"PR","tat":81,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"969022","modelo":"GC-B569NLL","uf":"PR","tat":76,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"969023","modelo":"C311WDW","uf":"PR","tat":76,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"969024","modelo":"C311WDW","uf":"PR","tat":76,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"969185","modelo":"50PUG6513/78","uf":"PR","tat":68,"tipo_garantia":"FORA DA GARANTIA","itens":""},{"os":"969423","modelo":"50U7045/78G","uf":"PR","tat":54,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"969425","modelo":"65C755","uf":"PR","tat":54,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"969426","modelo":"32R6610","uf":"PR","tat":54,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"969428","modelo":"43S5K","uf":"PR","tat":54,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"969429","modelo":"43S5K","uf":"PR","tat":54,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"969431","modelo":"PTV39N87D","uf":"PR","tat":54,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"969432","modelo":"43S615","uf":"PR","tat":54,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"969493","modelo":"GC-B569NLL2","uf":"PR","tat":49,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"969494","modelo":"GC-L257SLP1","uf":"PR","tat":49,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"969496","modelo":"GN-B392PLM2","uf":"PR","tat":49,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"969498","modelo":"GN-B392PLM","uf":"PR","tat":49,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"969500","modelo":"CV5012PC4","uf":"PR","tat":49,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"969508","modelo":"CV5012WC4","uf":"PR","tat":49,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"969510","modelo":"CV5014WC4","uf":"PR","tat":49,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"969512","modelo":"CV5014WC4","uf":"PR","tat":49,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"969513","modelo":"CV5012PC4","uf":"PR","tat":49,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"969517","modelo":"AWS-T2W-02","uf":"PR","tat":49,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"969658","modelo":"LE32S5970S","uf":"PR","tat":39,"tipo_garantia":"FORA DA GARANTIA","itens":""},{"os":"969660","modelo":"PH28N91DSGWA","uf":"PR","tat":39,"tipo_garantia":"FORA DA GARANTIA","itens":""},{"os":"969723","modelo":"55P7K","uf":"PR","tat":35,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"969729","modelo":"55P7K","uf":"PR","tat":35,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"969752","modelo":"32R6610","uf":"PR","tat":34,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"969759","modelo":"43S5K","uf":"PR","tat":34,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"969763","modelo":"65P735","uf":"PR","tat":34,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"969765","modelo":"65P635","uf":"PR","tat":34,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"969770","modelo":"50S62","uf":"PR","tat":34,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"969772","modelo":"50S62","uf":"PR","tat":34,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"969798","modelo":"50P7K","uf":"PR","tat":33,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"969803","modelo":"40S5K","uf":"PR","tat":33,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"969804","modelo":"40S5K","uf":"PR","tat":33,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"969806","modelo":"32S42","uf":"PR","tat":33,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"969807","modelo":"65P7K","uf":"PR","tat":33,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"969816","modelo":"75P7K","uf":"PR","tat":33,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"969828","modelo":"BOOMBOX AWS-BBS-01-B BIVOLT","uf":"RS","tat":33,"tipo_garantia":"Fora da Garantia","itens":""},{"os":"969829","modelo":"AG323FCXE","uf":"PR","tat":32,"tipo_garantia":"FORA DA GARANTIA","itens":""},{"os":"969869","modelo":"KDL-46EX725","uf":"PR","tat":28,"tipo_garantia":"FORA DA GARANTIA","itens":""},{"os":"969904","modelo":"P58KGA","uf":"PR","tat":27,"tipo_garantia":"GARANTIA FABRICA - PHILCO","itens":""},{"os":"969986","modelo":"58PUG7019/78","uf":"PR","tat":21,"tipo_garantia":"GARANTIA - CARDIF","itens":"SEM DEFEITO"},{"os":"969989","modelo":"55C655","uf":"PR","tat":21,"tipo_garantia":"FORA DA GARANTIA","itens":""},{"os":"969992","modelo":"50PUG7019/78","uf":"PR","tat":21,"tipo_garantia":"GARANTIA - ZURICH","itens":""},{"os":"970007","modelo":"CV5012WC4","uf":"PR","tat":20,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"970008","modelo":"CV5012WC4","uf":"PR","tat":20,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"970015","modelo":"CV5012WC4","uf":"PR","tat":20,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"970016","modelo":"C311WDS","uf":"PR","tat":20,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"970017","modelo":"C311WDW","uf":"PR","tat":20,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"970018","modelo":"C311WDW","uf":"PR","tat":20,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"970019","modelo":"C311WDS","uf":"PR","tat":20,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"970020","modelo":"CV5012WC4","uf":"PR","tat":20,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"970021","modelo":"CV5012WC4","uf":"PR","tat":20,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"970029","modelo":"C311WDS","uf":"PR","tat":20,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"970030","modelo":"C311WDW","uf":"PR","tat":20,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"970031","modelo":"CV5012WC4","uf":"PR","tat":20,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"970034","modelo":"PTV65G3BGTSSBL","uf":"PR","tat":19,"tipo_garantia":"GARANTIA DE FÁBRICA","itens":""},{"os":"970042","modelo":"TB11M","uf":"PR","tat":19,"tipo_garantia":"GARANTIA - ASSURANT RIVERSUL","itens":"BARRAS DELED"},{"os":"970043","modelo":"50P7K","uf":"PR","tat":19,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"970077","modelo":"50P755","uf":"PR","tat":19,"tipo_garantia":"GARANTIA - ZURICH","itens":""},{"os":"970087","modelo":"50U7045/78G","uf":"PR","tat":18,"tipo_garantia":"ATENDIMENTOS - MITSUO","itens":""},{"os":"970089","modelo":"C311WDS","uf":"PR","tat":18,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"970090","modelo":"C311WDW","uf":"PR","tat":18,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"970094","modelo":"43S6500FS","uf":"PR","tat":18,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"970097","modelo":"32S5K","uf":"PR","tat":18,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"970098","modelo":"C311WDS","uf":"PR","tat":18,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"970100","modelo":"58PUG7019/78","uf":"PR","tat":18,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"970101","modelo":"50S61","uf":"PR","tat":18,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"970103","modelo":"50 P755","uf":"PR","tat":18,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"970104","modelo":"50S61","uf":"PR","tat":18,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"970105","modelo":"55S62","uf":"PR","tat":18,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"970107","modelo":"S5400AF","uf":"PR","tat":17,"tipo_garantia":"GARANTIA - ZURICH","itens":""},{"os":"970127","modelo":"43S5135/78G","uf":"PR","tat":17,"tipo_garantia":"GARANTIA - ZURICH","itens":""},{"os":"970135","modelo":"55P7K","uf":"PR","tat":17,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"970138","modelo":"55P7K","uf":"PR","tat":17,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"970140","modelo":"55P7K","uf":"PR","tat":17,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"970141","modelo":"50P7K","uf":"PR","tat":17,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"970142","modelo":"50P7K","uf":"PR","tat":17,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"970144","modelo":"70PUG7019/78","uf":"PR","tat":17,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"970145","modelo":"75P7K","uf":"PR","tat":17,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"970147","modelo":"UN55DU7700G","uf":"PR","tat":14,"tipo_garantia":"GARANTIA - ZURICH","itens":""},{"os":"970148","modelo":"P755","uf":"PR","tat":14,"tipo_garantia":"GARANTIA - CARDIF","itens":""},{"os":"970156","modelo":"TAX5509/78","uf":"PR","tat":14,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"970159","modelo":"AWS-TV-43-BL-02-A","uf":"PR","tat":14,"tipo_garantia":"Fora da Garantia","itens":""},{"os":"970162","modelo":"C311WDW","uf":"PR","tat":14,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"970163","modelo":"27GE1","uf":"PR","tat":14,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"970166","modelo":"PTV50RCG70BL","uf":"PR","tat":14,"tipo_garantia":"GARANTIA - ASSURANT RIVERSUL","itens":""},{"os":"970167","modelo":"CQ32G4E/57","uf":"PR","tat":14,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"970169","modelo":"24G4/P/57","uf":"PR","tat":14,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"970172","modelo":"24G4/P/57","uf":"PR","tat":14,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"970173","modelo":"27G2E1","uf":"PR","tat":14,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"970174","modelo":"U34G4C/57","uf":"PR","tat":14,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"970176","modelo":"U34G4C/57","uf":"PR","tat":14,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"970178","modelo":"40PFL6615D/78","uf":"PR","tat":14,"tipo_garantia":"GARANTIA - FACIL ASSIST","itens":"PLACA PRINCIPAL"},{"os":"970180","modelo":"22B35HM23/57","uf":"PR","tat":14,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"970182","modelo":"55pug6300/78","uf":"PR","tat":14,"tipo_garantia":"GARANTIA - FACIL ASSIST","itens":""},{"os":"970183","modelo":"27G64","uf":"PR","tat":14,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"970185","modelo":"MS3091BC","uf":"PR","tat":14,"tipo_garantia":"REMESSA - MAGAZINE LUIZA","itens":""},{"os":"970214","modelo":"PTV50VA4REGB","uf":"PR","tat":13,"tipo_garantia":"GARANTIA - ZURICH","itens":""},{"os":"970227","modelo":"EARBUD AWS-EB-04-B BIVOLT","uf":"RS","tat":12,"tipo_garantia":"GARANTIA FABRICA - AIWA","itens":""},{"os":"970228","modelo":"PH39N91DSGWA","uf":"PR","tat":12,"tipo_garantia":"FORA DA GARANTIA","itens":""},{"os":"970230","modelo":"32S5400AF","uf":"PR","tat":12,"tipo_garantia":"GARANTIA - ZURICH","itens":""},{"os":"970250","modelo":"Delta-m3422AUC","uf":"PR","tat":11,"tipo_garantia":"GARANTIA - ASSURANT RIVERSUL","itens":""},{"os":"970265","modelo":"32S5400AF","uf":"PR","tat":11,"tipo_garantia":"GARANTIA - ZURICH","itens":""},{"os":"970274","modelo":"65P755","uf":"PR","tat":11,"tipo_garantia":"FORA DA GARANTIA","itens":""},{"os":"970289","modelo":"PTV50G2SGTSSBL","uf":"PR","tat":7,"tipo_garantia":"GARANTIA - ZURICH","itens":""},{"os":"970311","modelo":"PTV32G7ER2CPBLH","uf":"PR","tat":7,"tipo_garantia":"FORA DA GARANTIA","itens":""},{"os":"970315","modelo":"50PUG7406/78","uf":"PR","tat":7,"tipo_garantia":"FORA DA GARANTIA","itens":""},{"os":"970321","modelo":"50PUG6654/78","uf":"PR","tat":7,"tipo_garantia":"FORA DA GARANTIA","itens":""},{"os":"970327","modelo":"32S5400AF","uf":"PR","tat":6,"tipo_garantia":"GARANTIA - ZURICH","itens":""},{"os":"970328","modelo":"55DU7700G","uf":"PR","tat":6,"tipo_garantia":"GARANTIA - ZURICH","itens":""},{"os":"970349","modelo":"le50uhd20","uf":"PR","tat":6,"tipo_garantia":"GARANTIA - FACIL ASSIST","itens":""},{"os":"970383","modelo":"43S5400A","uf":"PR","tat":4,"tipo_garantia":"GARANTIA - ZURICH","itens":""},{"os":"970387","modelo":"65S62","uf":"PR","tat":4,"tipo_garantia":"GARANTIA FABRICA - TCL","itens":""},{"os":"970389","modelo":"P635","uf":"PR","tat":4,"tipo_garantia":"GARANTIA - CARDIF","itens":""},{"os":"970391","modelo":"AWS-HP-03-B","uf":"PR","tat":4,"tipo_garantia":"GARANTIA FABRICA - AIWA","itens":""},{"os":"970392","modelo":"AWS-HP-03-B","uf":"PR","tat":4,"tipo_garantia":"GARANTIA FABRICA - AIWA","itens":""},{"os":"970419","modelo":"PTV50RCG70BL","uf":"PR","tat":4,"tipo_garantia":"PRODUTO - VENDA","itens":""},{"os":"970450","modelo":"50PUG7019/78","uf":"PR","tat":0,"tipo_garantia":"GARANTIA - ZURICH","itens":""},{"os":"970466","modelo":"AWS-HP-04-B","uf":"SC","tat":0,"tipo_garantia":"GARANTIA FABRICA - AIWA","itens":""}];
+
+const AD=[{"os":"968091","modelo":"SMART TV LED 43\" LG THINQ AI","uf":"PR","tat":115,"tipo_garantia":"PRODUTO - VENDA","dt_visita":"","tec_visita":""},{"os":"968706","modelo":"50P635","uf":"PR","tat":90,"tipo_garantia":"FORA DA GARANTIA","dt_visita":"","tec_visita":""},{"os":"969544","modelo":"70PUG7408/78","uf":"PR","tat":47,"tipo_garantia":"GARANTIA DE FÁBRICA","dt_visita":"","tec_visita":""},{"os":"969592","modelo":"43S5135/78G","uf":"PR","tat":45,"tipo_garantia":"GARANTIA DE FÁBRICA","dt_visita":"","tec_visita":""},{"os":"969893","modelo":"UN7","uf":"PR","tat":28,"tipo_garantia":"GARANTIA - CARDIF","dt_visita":"","tec_visita":""},{"os":"969929","modelo":"50PUG7625/78","uf":"PR","tat":25,"tipo_garantia":"GARANTIA - ZURICH","dt_visita":"","tec_visita":""},{"os":"969937","modelo":"TL059M","uf":"PR","tat":25,"tipo_garantia":"GARANTIA - ASSURANT RIVERSUL","dt_visita":"15/06/2026","tec_visita":"CRISTIANO LUIZ"},{"os":"969991","modelo":"BOOMBOX 3","uf":"PR","tat":21,"tipo_garantia":"GARANTIA - ZURICH","dt_visita":"22/06/2026","tec_visita":"Mauro Kloss"},{"os":"970023","modelo":"75UA8550PSA","uf":"PR","tat":20,"tipo_garantia":"GARANTIA - ZURICH","dt_visita":"12/06/2026","tec_visita":"CRISTIANO LUIZ"},{"os":"970066","modelo":"confirmar modelo","uf":"PR","tat":19,"tipo_garantia":"GARANTIA - CARDIF","dt_visita":"","tec_visita":""},{"os":"970069","modelo":"50DU7700G","uf":"PR","tat":19,"tipo_garantia":"GARANTIA - CARDIF","dt_visita":"14/06/2026","tec_visita":"CRISTIANO LUIZ"},{"os":"970070","modelo":"UN65CU8000G","uf":"PR","tat":19,"tipo_garantia":"GARANTIA - CARDIF","dt_visita":"14/06/2026","tec_visita":"CRISTIANO LUIZ"},{"os":"970072","modelo":"55PUG7019/78","uf":"PR","tat":19,"tipo_garantia":"GARANTIA - ZURICH","dt_visita":"12/06/2026","tec_visita":"CRISTIANO LUIZ"},{"os":"970081","modelo":"50DU7700G","uf":"PR","tat":19,"tipo_garantia":"GARANTIA - ZURICH","dt_visita":"15/06/2026","tec_visita":"CRISTIANO LUIZ"},{"os":"970109","modelo":"UN50DU7700G","uf":"PR","tat":17,"tipo_garantia":"GARANTIA - ZURICH","dt_visita":"13/06/2026","tec_visita":"CRISTIANO LUIZ"},{"os":"970110","modelo":"65PUG7408/78","uf":"PR","tat":17,"tipo_garantia":"GARANTIA - ZURICH","dt_visita":"17/06/2026","tec_visita":"Mauro Kloss"},{"os":"970118","modelo":"65PUG7406/78","uf":"PR","tat":17,"tipo_garantia":"GARANTIA - ZURICH","dt_visita":"14/06/2026","tec_visita":"CRISTIANO LUIZ"},{"os":"970136","modelo":"55P6","uf":"PR","tat":17,"tipo_garantia":"GARANTIA - CARDIF","dt_visita":"","tec_visita":""},{"os":"970146","modelo":"PTV42M9GR2CMB","uf":"PR","tat":14,"tipo_garantia":"GARANTIA - ZURICH","dt_visita":"16/06/2026","tec_visita":"CRISTIANO LUIZ"},{"os":"970170","modelo":"PTV65G3BGTSSBL","uf":"PR","tat":14,"tipo_garantia":"GARANTIA - ZURICH","dt_visita":"18/06/2026","tec_visita":"DANILO DOS SANTOS GAMA"},{"os":"970186","modelo":"HQS60NKHM","uf":"PR","tat":14,"tipo_garantia":"FORA DA GARANTIA","dt_visita":"","tec_visita":""},{"os":"970187","modelo":"70PUG7408","uf":"PR","tat":14,"tipo_garantia":"GARANTIA - CARDIF","dt_visita":"","tec_visita":""},{"os":"970188","modelo":"UN32T4300AG","uf":"PR","tat":14,"tipo_garantia":"GARANTIA - CARDIF","dt_visita":"16/06/2026","tec_visita":"CRISTIANO LUIZ"},{"os":"970189","modelo":"PTV55G7EAGCPBL","uf":"PR","tat":13,"tipo_garantia":"GARANTIA - ZURICH","dt_visita":"15/06/2026","tec_visita":"CRISTIANO LUIZ"},{"os":"970205","modelo":"40S5400A","uf":"PR","tat":13,"tipo_garantia":"GARANTIA - CARDIF","dt_visita":"11/06/2026","tec_visita":"CRISTIANO LUIZ"},{"os":"970210","modelo":"UN50DU7700","uf":"PR","tat":13,"tipo_garantia":"GARANTIA - CARDIF","dt_visita":"16/06/2026","tec_visita":"CRISTIANO LUIZ"},{"os":"970211","modelo":"50DU7700","uf":"PR","tat":13,"tipo_garantia":"GARANTIA - CARDIF","dt_visita":"","tec_visita":""},{"os":"970212","modelo":"65DU7700","uf":"PR","tat":13,"tipo_garantia":"GARANTIA - CARDIF","dt_visita":"12/06/2026","tec_visita":"CRISTIANO LUIZ"},{"os":"970213","modelo":"55 QLED","uf":"PR","tat":13,"tipo_garantia":"GARANTIA - CARDIF","dt_visita":"","tec_visita":""},{"os":"970231","modelo":"58PUG7019/78","uf":"PR","tat":12,"tipo_garantia":"GARANTIA - CARDIF","dt_visita":"16/06/2026","tec_visita":"CRISTIANO LUIZ"},{"os":"970236","modelo":"TB016M","uf":"PR","tat":11,"tipo_garantia":"GARANTIA - ZURICH","dt_visita":"13/06/2026","tec_visita":"CRISTIANO LUIZ"},{"os":"970237","modelo":"50PUG7408 /78","uf":"PR","tat":11,"tipo_garantia":"GARANTIA - ZURICH","dt_visita":"18/06/2026","tec_visita":"DANILO DOS SANTOS GAMA"},{"os":"970241","modelo":"65P635","uf":"PR","tat":11,"tipo_garantia":"GARANTIA - ZURICH","dt_visita":"14/06/2026","tec_visita":"CRISTIANO LUIZ"},{"os":"970242","modelo":"PCX4500","uf":"PR","tat":11,"tipo_garantia":"GARANTIA - ZURICH","dt_visita":"","tec_visita":""},{"os":"970266","modelo":"PTV65G3BGTSSBL","uf":"PR","tat":11,"tipo_garantia":"GARANTIA - ZURICH","dt_visita":"15/06/2026","tec_visita":"CRISTIANO LUIZ"},{"os":"970268","modelo":"65AU7700","uf":"PR","tat":11,"tipo_garantia":"GARANTIA - ZURICH","dt_visita":"","tec_visita":""},{"os":"970269","modelo":"50RK8500 V2","uf":"PR","tat":11,"tipo_garantia":"GARANTIA - CARDIF","dt_visita":"14/06/2026","tec_visita":"CRISTIANO LUIZ"},{"os":"970270","modelo":"AOC 50\" Roku 4","uf":"PR","tat":11,"tipo_garantia":"GARANTIA - ASSURANT RIVERSUL","dt_visita":"","tec_visita":""},{"os":"970283","modelo":"55C350L","uf":"PR","tat":10,"tipo_garantia":"GARANTIA - ASSURANT RIVERSUL","dt_visita":"","tec_visita":""},{"os":"970286","modelo":"55\" 4K","uf":"PR","tat":10,"tipo_garantia":"GARANTIA - ASSURANT RIVERSUL","dt_visita":"","tec_visita":""},{"os":"970288","modelo":"UN65DU7700GXZD","uf":"PR","tat":10,"tipo_garantia":"GARANTIA - ZURICH","dt_visita":"","tec_visita":""},{"os":"970290","modelo":"50DU7700","uf":"PR","tat":7,"tipo_garantia":"GARANTIA - ZURICH","dt_visita":"","tec_visita":""},{"os":"970291","modelo":"55PUG7408/78","uf":"PR","tat":7,"tipo_garantia":"GARANTIA - ZURICH","dt_visita":"","tec_visita":""},{"os":"970293","modelo":"PTV42G6FR2CPF","uf":"PR","tat":7,"tipo_garantia":"GARANTIA - ZURICH","dt_visita":"17/06/2026","tec_visita":"DANILO DOS SANTOS GAMA"},{"os":"970294","modelo":"50 UN5","uf":"PR","tat":7,"tipo_garantia":"GARANTIA - CARDIF","dt_visita":"","tec_visita":""},{"os":"970295","modelo":"55DU7700","uf":"PR","tat":7,"tipo_garantia":"GARANTIA - CARDIF","dt_visita":"","tec_visita":""},{"os":"970296","modelo":"65 UN6","uf":"PR","tat":7,"tipo_garantia":"GARANTIA - CARDIF","dt_visita":"","tec_visita":""},{"os":"970316","modelo":"43S6","uf":"PR","tat":7,"tipo_garantia":"garantia - luizaseg","dt_visita":"","tec_visita":""},{"os":"970317","modelo":"65 UN6","uf":"PR","tat":7,"tipo_garantia":"GARANTIA - CARDIF","dt_visita":"","tec_visita":""},{"os":"970318","modelo":"50 UN5","uf":"PR","tat":7,"tipo_garantia":"GARANTIA - CARDIF","dt_visita":"","tec_visita":""},{"os":"970319","modelo":"PTV65G3BGTSSBL","uf":"PR","tat":7,"tipo_garantia":"GARANTIA - ZURICH","dt_visita":"","tec_visita":""},{"os":"970320","modelo":"UN55DU7700GXZD","uf":"PR","tat":7,"tipo_garantia":"GARANTIA - ZURICH","dt_visita":"","tec_visita":""},{"os":"970322","modelo":"55DU7700","uf":"PR","tat":6,"tipo_garantia":"GARANTIA - CARDIF","dt_visita":"","tec_visita":""},{"os":"970323","modelo":"UN65","uf":"PR","tat":6,"tipo_garantia":"GARANTIA - CARDIF","dt_visita":"","tec_visita":""},{"os":"970324","modelo":"55C655","uf":"PR","tat":6,"tipo_garantia":"GARANTIA - CARDIF","dt_visita":"22/06/2026","tec_visita":"DANILO DOS SANTOS GAMA"},{"os":"970325","modelo":"S5400AF","uf":"PR","tat":6,"tipo_garantia":"GARANTIA - CARDIF","dt_visita":"","tec_visita":""},{"os":"970326","modelo":"65DU7700","uf":"PR","tat":6,"tipo_garantia":"GARANTIA - CARDIF","dt_visita":"","tec_visita":""},{"os":"970329","modelo":"PCX20000 1800W","uf":"PR","tat":6,"tipo_garantia":"GARANTIA - ZURICH","dt_visita":"","tec_visita":""},{"os":"970330","modelo":"P755","uf":"PR","tat":6,"tipo_garantia":"GARANTIA - ZURICH","dt_visita":"","tec_visita":""},{"os":"970331","modelo":"50DU7700","uf":"PR","tat":6,"tipo_garantia":"GARANTIA - CARDIF","dt_visita":"","tec_visita":""},{"os":"970333","modelo":"43DU7700","uf":"PR","tat":6,"tipo_garantia":"GARANTIA - CARDIF","dt_visita":"","tec_visita":""},{"os":"970344","modelo":"PTV65G3BGTSSBL","uf":"PR","tat":6,"tipo_garantia":"GARANTIA - ZURICH","dt_visita":"","tec_visita":""},{"os":"970345","modelo":"65P755","uf":"PR","tat":6,"tipo_garantia":"GARANTIA - ZURICH","dt_visita":"","tec_visita":""},{"os":"970357","modelo":"58PUG7019/78","uf":"PR","tat":6,"tipo_garantia":"GARANTIA - CARDIF","dt_visita":"","tec_visita":""},{"os":"970360","modelo":"PCX4500","uf":"PR","tat":5,"tipo_garantia":"GARANTIA - ZURICH","dt_visita":"19/06/2026","tec_visita":"DANILO DOS SANTOS GAMA"},{"os":"970364","modelo":"50QN90D","uf":"PR","tat":5,"tipo_garantia":"GARANTIA - CARDIF","dt_visita":"","tec_visita":""},{"os":"970365","modelo":"50DU7700","uf":"PR","tat":5,"tipo_garantia":"GARANTIA - CARDIF","dt_visita":"","tec_visita":""},{"os":"970366","modelo":"50DU7700","uf":"PR","tat":5,"tipo_garantia":"GARANTIA - CARDIF","dt_visita":"","tec_visita":""},{"os":"970367","modelo":"50U7045/78G","uf":"PR","tat":5,"tipo_garantia":"GARANTIA - CARDIF","dt_visita":"22/06/2026","tec_visita":"DANILO DOS SANTOS GAMA"},{"os":"970368","modelo":"PTV40G65RCH","uf":"PR","tat":5,"tipo_garantia":"GARANTIA - ZURICH","dt_visita":"","tec_visita":""},{"os":"970369","modelo":"50DU7700","uf":"PR","tat":5,"tipo_garantia":"GARANTIA - ZURICH","dt_visita":"","tec_visita":""},{"os":"970371","modelo":"UN50DU7700GXZD","uf":"PR","tat":5,"tipo_garantia":"GARANTIA - ZURICH","dt_visita":"","tec_visita":""},{"os":"970372","modelo":"UN55DU7700GXZD","uf":"PR","tat":5,"tipo_garantia":"GARANTIA - ZURICH","dt_visita":"","tec_visita":""},{"os":"970384","modelo":"S5400AF","uf":"PR","tat":4,"tipo_garantia":"GARANTIA - ZURICH","dt_visita":"22/06/2026","tec_visita":"DANILO DOS SANTOS GAMA"},{"os":"970385","modelo":"UN50DU7700GXZD","uf":"PR","tat":4,"tipo_garantia":"GARANTIA - ZURICH","dt_visita":"","tec_visita":""},{"os":"970386","modelo":"50PUG7019/78","uf":"PR","tat":4,"tipo_garantia":"GARANTIA - ZURICH","dt_visita":"","tec_visita":""},{"os":"970388","modelo":"50DU7700","uf":"PR","tat":4,"tipo_garantia":"GARANTIA - CARDIF","dt_visita":"","tec_visita":""},{"os":"970390","modelo":"58PUG7019/78","uf":"PR","tat":4,"tipo_garantia":"GARANTIA - CARDIF","dt_visita":"19/06/2026","tec_visita":"DANILO DOS SANTOS GAMA"},{"os":"970397","modelo":"GK530BR/FG","uf":"PR","tat":4,"tipo_garantia":"Garantia Fábrica - TPV","dt_visita":"","tec_visita":""},{"os":"970401","modelo":"UN50DU7700GXZD","uf":"PR","tat":4,"tipo_garantia":"GARANTIA - ZURICH","dt_visita":"","tec_visita":""},{"os":"970402","modelo":"50AU7700","uf":"PR","tat":4,"tipo_garantia":"GARANTIA - ZURICH","dt_visita":"","tec_visita":""},{"os":"970403","modelo":"BTV32D10N5SKH","uf":"PR","tat":4,"tipo_garantia":"GARANTIA - ZURICH","dt_visita":"22/06/2026","tec_visita":"Mauro Kloss"},{"os":"970404","modelo":"PTV42G6FR2CPF","uf":"PR","tat":4,"tipo_garantia":"GARANTIA - ASSURANT RIVERSUL","dt_visita":"","tec_visita":""},{"os":"970405","modelo":"65P755","uf":"PR","tat":4,"tipo_garantia":"GARANTIA - CARDIF","dt_visita":"","tec_visita":""},{"os":"970422","modelo":"43S504578","uf":"PR","tat":3,"tipo_garantia":"GARANTIA - ZURICH","dt_visita":"","tec_visita":""},{"os":"970423","modelo":"AWS-BBS-01-B","uf":"PR","tat":3,"tipo_garantia":"GARANTIA FABRICA - AIWA","dt_visita":"","tec_visita":""},{"os":"970426","modelo":"TV ROKU LED 43","uf":"PR","tat":3,"tipo_garantia":"GARANTIA - FACIL ASSIST","dt_visita":"23/06/2026","tec_visita":"DANILO DOS SANTOS GAMA"},{"os":"970427","modelo":"UN50CU7700GXZD","uf":"PR","tat":3,"tipo_garantia":"GARANTIA - ZURICH","dt_visita":"","tec_visita":""},{"os":"970428","modelo":"65C350L","uf":"PR","tat":3,"tipo_garantia":"GARANTIA - ZURICH","dt_visita":"","tec_visita":""},{"os":"970429","modelo":"43S6","uf":"PR","tat":3,"tipo_garantia":"GARANTIA - CARDIF","dt_visita":"","tec_visita":""},{"os":"970430","modelo":"u65","uf":"PR","tat":3,"tipo_garantia":"GARANTIA - LUIZASEG","dt_visita":"","tec_visita":""},{"os":"970444","modelo":"PTV50RCG70BL","uf":"PR","tat":0,"tipo_garantia":"Fora da Garantia","dt_visita":"","tec_visita":""},{"os":"970445","modelo":"43S5045/78G","uf":"PR","tat":0,"tipo_garantia":"FORA DA GARANTIA","dt_visita":"","tec_visita":""},{"os":"970446","modelo":"ptv50rcg70bl","uf":"PR","tat":0,"tipo_garantia":"GARANTIA - FACIL ASSIST","dt_visita":"22/06/2026","tec_visita":"DANILO DOS SANTOS GAMA"},{"os":"970447","modelo":"50P7K","uf":"PR","tat":0,"tipo_garantia":"GARANTIA FABRICA - TCL","dt_visita":"","tec_visita":""},{"os":"970448","modelo":"un50tu8000g","uf":"PR","tat":0,"tipo_garantia":"GARANTIA - FACIL ASSIST","dt_visita":"23/06/2026","tec_visita":"DANILO DOS SANTOS GAMA"},{"os":"970449","modelo":"PCX4501","uf":"PR","tat":0,"tipo_garantia":"GARANTIA - ZURICH","dt_visita":"","tec_visita":""},{"os":"970451","modelo":"UN55DU7700GXZD","uf":"PR","tat":0,"tipo_garantia":"GARANTIA - ZURICH","dt_visita":"","tec_visita":""},{"os":"970452","modelo":"32PHG6909/78","uf":"PR","tat":0,"tipo_garantia":"GARANTIA - ZURICH","dt_visita":"","tec_visita":""},{"os":"970453","modelo":"50P635","uf":"PR","tat":0,"tipo_garantia":"GARANTIA - ZURICH","dt_visita":"","tec_visita":""},{"os":"970454","modelo":"Roku 42\"","uf":"PR","tat":0,"tipo_garantia":"GARANTIA - ASSURANT RIVERSUL","dt_visita":"","tec_visita":""},{"os":"970455","modelo":"Kg251q Bivolt","uf":"PR","tat":0,"tipo_garantia":"GARANTIA - ASSURANT RIVERSUL","dt_visita":"","tec_visita":""},{"os":"970456","modelo":"C655","uf":"PR","tat":0,"tipo_garantia":"GARANTIA - CARDIF","dt_visita":"","tec_visita":""},{"os":"970457","modelo":"50 4K","uf":"PR","tat":0,"tipo_garantia":"GARANTIA - CARDIF","dt_visita":"","tec_visita":""},{"os":"970458","modelo":"TV LG 50 POLEGADAS","uf":"PR","tat":0,"tipo_garantia":"GARANTIA - FACIL ASSIST","dt_visita":"23/06/2026","tec_visita":"DANILO DOS SANTOS GAMA"},{"os":"970459","modelo":"55P7K","uf":"PR","tat":0,"tipo_garantia":"GARANTIA FABRICA - TCL","dt_visita":"","tec_visita":""},{"os":"970464","modelo":"50P7K","uf":"PR","tat":0,"tipo_garantia":"GARANTIA FABRICA - TCL","dt_visita":"","tec_visita":""},{"os":"970465","modelo":"50PUG7408/78","uf":"PR","tat":0,"tipo_garantia":"GARANTIA - ZURICH","dt_visita":"","tec_visita":""},{"os":"970467","modelo":"50P7K","uf":"PR","tat":0,"tipo_garantia":"FORA DA GARANTIA","dt_visita":"","tec_visita":""},{"os":"970468","modelo":"43P755","uf":"PR","tat":0,"tipo_garantia":"FORA DA GARANTIA","dt_visita":"","tec_visita":""},{"os":"970469","modelo":"43P755","uf":"PR","tat":0,"tipo_garantia":"FORA DA GARANTIA","dt_visita":"","tec_visita":""},{"os":"970470","modelo":"50DU7700","uf":"PR","tat":0,"tipo_garantia":"GARANTIA - ZURICH","dt_visita":"","tec_visita":""},{"os":"970471","modelo":"55","uf":"PR","tat":0,"tipo_garantia":"GARANTIA - ZURICH","dt_visita":"","tec_visita":""},{"os":"970472","modelo":"UN55CU7700GXZD","uf":"PR","tat":0,"tipo_garantia":"GARANTIA - ZURICH","dt_visita":"","tec_visita":""}];
+const IND={"meses":["02/2026","03/2026","04/2026","05/2026","06/2026"],"garantias":["FORA DA GARANTIA","FORA DA GARANTIA (RETORNO)","GARANTIA - ASSURANT RIVERSUL","GARANTIA - CARDIF","GARANTIA - FACIL ASSIST","GARANTIA - LUIZASEG","GARANTIA - ZURICH","GARANTIA DE FÁBRICA","GARANTIA FABRICA - AIWA","GARANTIA FABRICA - BRITANIA","GARANTIA FABRICA - PHILCO","GARANTIA FABRICA - TCL","GARANTIA FÁBRICA - TPV","PAGAMENTO - TCL","PRODUTO - VENDA","REMESSA - COLOMBO","REMESSA - MAGAZINE LUIZA"],"data":{"02/2026":{"PRODUTO - VENDA":{"CONSERTADO":21,"TROCA":0,"CANCELADA":0,"NÃO AUTORIZADO":0,"SEM DEFEITO":0,"LAUDO":0},"GARANTIA - CARDIF":{"CONSERTADO":9,"TROCA":0,"CANCELADA":2,"NÃO AUTORIZADO":0,"SEM DEFEITO":0,"LAUDO":1},"GARANTIA FABRICA - PHILCO":{"CONSERTADO":5,"TROCA":0,"CANCELADA":0,"NÃO AUTORIZADO":0,"SEM DEFEITO":0,"LAUDO":0},"GARANTIA FABRICA - TCL":{"CONSERTADO":34,"TROCA":1,"CANCELADA":3,"NÃO AUTORIZADO":0,"SEM DEFEITO":0,"LAUDO":0},"GARANTIA - ZURICH":{"CONSERTADO":18,"TROCA":3,"CANCELADA":4,"NÃO AUTORIZADO":2,"SEM DEFEITO":3,"LAUDO":1},"GARANTIA FÁBRICA - TPV":{"CONSERTADO":20,"TROCA":2,"CANCELADA":1,"NÃO AUTORIZADO":0,"SEM DEFEITO":0,"LAUDO":0},"REMESSA - MAGAZINE LUIZA":{"CONSERTADO":40,"TROCA":0,"CANCELADA":0,"NÃO AUTORIZADO":3,"SEM DEFEITO":0,"LAUDO":0},"GARANTIA - ASSURANT RIVERSUL":{"CONSERTADO":2,"TROCA":2,"CANCELADA":0,"NÃO AUTORIZADO":0,"SEM DEFEITO":0,"LAUDO":0},"GARANTIA FABRICA - AIWA":{"CONSERTADO":1,"TROCA":0,"CANCELADA":0,"NÃO AUTORIZADO":0,"SEM DEFEITO":1,"LAUDO":0},"FORA DA GARANTIA":{"CONSERTADO":1,"TROCA":0,"CANCELADA":0,"NÃO AUTORIZADO":3,"SEM DEFEITO":0,"LAUDO":0},"PAGAMENTO - TCL":{"CONSERTADO":1,"TROCA":0,"CANCELADA":0,"NÃO AUTORIZADO":0,"SEM DEFEITO":0,"LAUDO":0}},"03/2026":{"FORA DA GARANTIA":{"CONSERTADO":12,"TROCA":0,"CANCELADA":1,"NÃO AUTORIZADO":5,"SEM DEFEITO":1,"LAUDO":0},"GARANTIA FABRICA - TCL":{"CONSERTADO":129,"TROCA":2,"CANCELADA":30,"NÃO AUTORIZADO":0,"SEM DEFEITO":1,"LAUDO":0},"GARANTIA - ZURICH":{"CONSERTADO":85,"TROCA":12,"CANCELADA":19,"NÃO AUTORIZADO":1,"SEM DEFEITO":5,"LAUDO":2},"REMESSA - MAGAZINE LUIZA":{"CONSERTADO":15,"TROCA":0,"CANCELADA":0,"NÃO AUTORIZADO":0,"SEM DEFEITO":0,"LAUDO":0},"GARANTIA FÁBRICA - TPV":{"CONSERTADO":60,"TROCA":7,"CANCELADA":14,"NÃO AUTORIZADO":0,"SEM DEFEITO":0,"LAUDO":0},"GARANTIA - CARDIF":{"CONSERTADO":18,"TROCA":2,"CANCELADA":2,"NÃO AUTORIZADO":1,"SEM DEFEITO":3,"LAUDO":4},"GARANTIA - LUIZASEG":{"CONSERTADO":5,"TROCA":0,"CANCELADA":1,"NÃO AUTORIZADO":0,"SEM DEFEITO":0,"LAUDO":0},"PRODUTO - VENDA":{"CONSERTADO":72,"TROCA":0,"CANCELADA":0,"NÃO AUTORIZADO":0,"SEM DEFEITO":0,"LAUDO":0},"GARANTIA - FACIL ASSIST":{"CONSERTADO":2,"TROCA":0,"CANCELADA":2,"NÃO AUTORIZADO":2,"SEM DEFEITO":1,"LAUDO":0},"GARANTIA FABRICA - PHILCO":{"CONSERTADO":8,"TROCA":7,"CANCELADA":0,"NÃO AUTORIZADO":0,"SEM DEFEITO":1,"LAUDO":0},"GARANTIA FABRICA - BRITANIA":{"CONSERTADO":3,"TROCA":0,"CANCELADA":0,"NÃO AUTORIZADO":0,"SEM DEFEITO":0,"LAUDO":0},"GARANTIA FABRICA - AIWA":{"CONSERTADO":11,"TROCA":8,"CANCELADA":0,"NÃO AUTORIZADO":0,"SEM DEFEITO":0,"LAUDO":0},"GARANTIA - ASSURANT RIVERSUL":{"CONSERTADO":2,"TROCA":3,"CANCELADA":2,"NÃO AUTORIZADO":0,"SEM DEFEITO":0,"LAUDO":2},"GARANTIA DE FÁBRICA":{"CONSERTADO":3,"TROCA":0,"CANCELADA":0,"NÃO AUTORIZADO":0,"SEM DEFEITO":0,"LAUDO":0},"REMESSA - COLOMBO":{"CONSERTADO":1,"TROCA":0,"CANCELADA":0,"NÃO AUTORIZADO":0,"SEM DEFEITO":0,"LAUDO":0}},"04/2026":{"GARANTIA FABRICA - AIWA":{"CONSERTADO":16,"TROCA":3,"CANCELADA":0,"NÃO AUTORIZADO":0,"SEM DEFEITO":0,"LAUDO":0},"GARANTIA - ZURICH":{"CONSERTADO":60,"TROCA":26,"CANCELADA":17,"NÃO AUTORIZADO":0,"SEM DEFEITO":10,"LAUDO":1},"GARANTIA - CARDIF":{"CONSERTADO":17,"TROCA":6,"CANCELADA":4,"NÃO AUTORIZADO":0,"SEM DEFEITO":0,"LAUDO":1},"GARANTIA FÁBRICA - TPV":{"CONSERTADO":62,"TROCA":16,"CANCELADA":11,"NÃO AUTORIZADO":0,"SEM DEFEITO":1,"LAUDO":0},"GARANTIA - FACIL ASSIST":{"CONSERTADO":1,"TROCA":0,"CANCELADA":1,"NÃO AUTORIZADO":1,"SEM DEFEITO":0,"LAUDO":0},"GARANTIA FABRICA - TCL":{"CONSERTADO":98,"TROCA":3,"CANCELADA":8,"NÃO AUTORIZADO":0,"SEM DEFEITO":1,"LAUDO":0},"GARANTIA - ASSURANT RIVERSUL":{"CONSERTADO":7,"TROCA":7,"CANCELADA":4,"NÃO AUTORIZADO":0,"SEM DEFEITO":0,"LAUDO":1},"PRODUTO - VENDA":{"CONSERTADO":52,"TROCA":0,"CANCELADA":0,"NÃO AUTORIZADO":0,"SEM DEFEITO":0,"LAUDO":0},"REMESSA - MAGAZINE LUIZA":{"CONSERTADO":2,"TROCA":0,"CANCELADA":0,"NÃO AUTORIZADO":2,"SEM DEFEITO":0,"LAUDO":0},"GARANTIA FABRICA - PHILCO":{"CONSERTADO":4,"TROCA":3,"CANCELADA":0,"NÃO AUTORIZADO":0,"SEM DEFEITO":0,"LAUDO":0},"FORA DA GARANTIA":{"CONSERTADO":11,"TROCA":0,"CANCELADA":0,"NÃO AUTORIZADO":3,"SEM DEFEITO":1,"LAUDO":0},"GARANTIA - LUIZASEG":{"CONSERTADO":0,"TROCA":1,"CANCELADA":0,"NÃO AUTORIZADO":0,"SEM DEFEITO":0,"LAUDO":0},"GARANTIA DE FÁBRICA":{"CONSERTADO":2,"TROCA":0,"CANCELADA":0,"NÃO AUTORIZADO":0,"SEM DEFEITO":0,"LAUDO":0},"GARANTIA FABRICA - BRITANIA":{"CONSERTADO":0,"TROCA":2,"CANCELADA":0,"NÃO AUTORIZADO":0,"SEM DEFEITO":0,"LAUDO":0}},"05/2026":{"GARANTIA - ZURICH":{"CONSERTADO":56,"TROCA":21,"CANCELADA":9,"NÃO AUTORIZADO":0,"SEM DEFEITO":1,"LAUDO":4},"PRODUTO - VENDA":{"CONSERTADO":25,"TROCA":0,"CANCELADA":0,"NÃO AUTORIZADO":0,"SEM DEFEITO":0,"LAUDO":0},"GARANTIA - CARDIF":{"CONSERTADO":24,"TROCA":10,"CANCELADA":6,"NÃO AUTORIZADO":0,"SEM DEFEITO":2,"LAUDO":3},"GARANTIA FABRICA - TCL":{"CONSERTADO":98,"TROCA":1,"CANCELADA":13,"NÃO AUTORIZADO":0,"SEM DEFEITO":0,"LAUDO":0},"GARANTIA FABRICA - AIWA":{"CONSERTADO":3,"TROCA":1,"CANCELADA":0,"NÃO AUTORIZADO":0,"SEM DEFEITO":0,"LAUDO":0},"GARANTIA FÁBRICA - TPV":{"CONSERTADO":42,"TROCA":17,"CANCELADA":12,"NÃO AUTORIZADO":1,"SEM DEFEITO":0,"LAUDO":0},"GARANTIA - ASSURANT RIVERSUL":{"CONSERTADO":6,"TROCA":3,"CANCELADA":4,"NÃO AUTORIZADO":0,"SEM DEFEITO":0,"LAUDO":0},"REMESSA - MAGAZINE LUIZA":{"CONSERTADO":9,"TROCA":0,"CANCELADA":0,"NÃO AUTORIZADO":0,"SEM DEFEITO":0,"LAUDO":0},"GARANTIA - LUIZASEG":{"CONSERTADO":1,"TROCA":0,"CANCELADA":1,"NÃO AUTORIZADO":0,"SEM DEFEITO":1,"LAUDO":0},"FORA DA GARANTIA":{"CONSERTADO":7,"TROCA":0,"CANCELADA":1,"NÃO AUTORIZADO":7,"SEM DEFEITO":3,"LAUDO":0},"GARANTIA FABRICA - PHILCO":{"CONSERTADO":1,"TROCA":3,"CANCELADA":0,"NÃO AUTORIZADO":0,"SEM DEFEITO":0,"LAUDO":0},"GARANTIA - FACIL ASSIST":{"CONSERTADO":3,"TROCA":0,"CANCELADA":0,"NÃO AUTORIZADO":3,"SEM DEFEITO":0,"LAUDO":0}},"06/2026":{"GARANTIA - ZURICH":{"CONSERTADO":9,"TROCA":3,"CANCELADA":11,"NÃO AUTORIZADO":1,"SEM DEFEITO":2,"LAUDO":5},"GARANTIA FÁBRICA - TPV":{"CONSERTADO":17,"TROCA":4,"CANCELADA":3,"NÃO AUTORIZADO":0,"SEM DEFEITO":0,"LAUDO":0},"PRODUTO - VENDA":{"CONSERTADO":15,"TROCA":0,"CANCELADA":0,"NÃO AUTORIZADO":0,"SEM DEFEITO":0,"LAUDO":0},"GARANTIA FABRICA - TCL":{"CONSERTADO":48,"TROCA":0,"CANCELADA":4,"NÃO AUTORIZADO":0,"SEM DEFEITO":1,"LAUDO":0},"GARANTIA - CARDIF":{"CONSERTADO":0,"TROCA":0,"CANCELADA":1,"NÃO AUTORIZADO":0,"SEM DEFEITO":0,"LAUDO":1},"FORA DA GARANTIA":{"CONSERTADO":3,"TROCA":0,"CANCELADA":0,"NÃO AUTORIZADO":2,"SEM DEFEITO":1,"LAUDO":0},"GARANTIA - FACIL ASSIST":{"CONSERTADO":1,"TROCA":0,"CANCELADA":1,"NÃO AUTORIZADO":0,"SEM DEFEITO":0,"LAUDO":0},"REMESSA - MAGAZINE LUIZA":{"CONSERTADO":1,"TROCA":0,"CANCELADA":0,"NÃO AUTORIZADO":0,"SEM DEFEITO":0,"LAUDO":0},"GARANTIA FABRICA - AIWA":{"CONSERTADO":4,"TROCA":0,"CANCELADA":0,"NÃO AUTORIZADO":0,"SEM DEFEITO":0,"LAUDO":1},"FORA DA GARANTIA (RETORNO)":{"CONSERTADO":1,"TROCA":0,"CANCELADA":0,"NÃO AUTORIZADO":0,"SEM DEFEITO":0,"LAUDO":0}}}};
+const DESFECHOS=["CONSERTADO","TROCA","CANCELADA","NÃO AUTORIZADO","SEM DEFEITO","LAUDO"];
+const CORES={"CONSERTADO":"#2ecc71","TROCA":"#4f7cff","CANCELADA":"#ff4d4d","NÃO AUTORIZADO":"#f0a500","SEM DEFEITO":"#00c8b8","LAUDO":"#9b59b6"};
+const COLS=["os","modelo","uf","tat","tipo_garantia","itens"];
+const ALERT=15, PAGE=30;
+
+// ─── ESTADO ───────────────────────────────────────────────────────────────────
+// Cada aba de OS tem seu próprio estado
+const TABS = {
+  as: {src:AS, sel:new Set(), sort:{k:"tat",d:-1}, page:1, onlyAlert:false, cols:["os","modelo","uf","tat","tipo_garantia","itens"]},
+  aa: {src:AA, sel:new Set(), sort:{k:"tat",d:-1}, page:1, onlyAlert:false, cols:["os","modelo","uf","tat","tipo_garantia","itens"]},
+  ad: {src:AD, sel:new Set(), sort:{k:"tat",d:-1}, page:1, onlyAlert:false, cols:["os","modelo","uf","tat","tipo_garantia","dt_visita","tec_visita"]}
+};
+const IND_STATE = {selMes:new Set(), selGar:new Set()};
+
+// ─── NAVEGAÇÃO DE ABAS ────────────────────────────────────────────────────────
+function showTab(panelId) {
+  document.querySelectorAll(".tab").forEach(t =>
+    t.classList.toggle("active", t.dataset.panel === panelId));
+  document.querySelectorAll(".panel").forEach(p =>
+    p.classList.toggle("active", p.id === panelId));
+}
+
+document.querySelectorAll(".tab").forEach(t =>
+  t.addEventListener("click", () => showTab(t.dataset.panel)));
+
+// ─── MULTI-SELECT ─────────────────────────────────────────────────────────────
+function buildMsList(listId, items) {
+  const el = document.getElementById(listId);
+  el.innerHTML = items.map(v => {
+    const id = "cb_" + listId + "_" + v.replace(/[^a-z0-9]/gi,"_");
+    return `<div class="ms-item">
+      <input type="checkbox" id="${id}">
+      <label for="${id}">${v}</label>
+    </div>`;
+  }).join("");
+}
+
+function toggleMs(ddId) {
+  const dd = document.getElementById(ddId);
+  const wasOpen = !dd.classList.contains("hidden");
+  // fechar todos os dropdowns abertos
+  document.querySelectorAll(".ms-dropdown").forEach(d => d.classList.add("hidden"));
+  document.querySelectorAll(".ms-trigger").forEach(t => t.classList.remove("open"));
+  if (!wasOpen) {
+    dd.classList.remove("hidden");
+    // encontrar o trigger associado e marcar como open
+    const wrap = dd.closest(".ms-wrap");
+    if (wrap) wrap.querySelector(".ms-trigger").classList.add("open");
+  }
+}
+
+document.addEventListener("click", e => {
+  if (!e.target.closest(".ms-wrap")) {
+    document.querySelectorAll(".ms-dropdown").forEach(d => d.classList.add("hidden"));
+    document.querySelectorAll(".ms-trigger").forEach(t => t.classList.remove("open"));
+  }
+});
+
+function filterMsItems(listId, q) {
+  document.querySelectorAll("#" + listId + " .ms-item").forEach(item => {
+    item.style.display = item.querySelector("label").textContent.toLowerCase().includes(q.toLowerCase()) ? "flex" : "none";
+  });
+}
+
+// Retorna o Set de seleção para um dado contexto
+function getSelSet(ctx) {
+  if (ctx === "mes") return IND_STATE.selMes;
+  if (ctx === "indgar") return IND_STATE.selGar;
+  return TABS[ctx].sel;
+}
+
+// Retorna o trigger e lista IDs para um dado contexto
+function getCtxIds(ctx) {
+  const map = {
+    as:     {trig:"trig-as",     list:"list-as"},
+    aa:     {trig:"trig-aa",     list:"list-aa"},
+    ad:     {trig:"trig-ad",     list:"list-ad"},
+    mes:    {trig:"trig-mes",    list:"list-mes"},
+    indgar: {trig:"trig-indgar", list:"list-indgar"}
+  };
+  return map[ctx];
+}
+
+function updateTriggerLabel(ctx) {
+  const sel = getSelSet(ctx);
+  const {trig} = getCtxIds(ctx);
+  const el = document.getElementById(trig);
+  const lbl = el.querySelector(".ms-label");
+  const n = sel.size;
+  const defaults = {as:"Todos os tipos de garantia",aa:"Todos os tipos de garantia",
+    ad:"Todos os tipos de garantia",mes:"Todos os meses",indgar:"Todos os tipos de garantia"};
+  if (n === 0) {
+    lbl.textContent = defaults[ctx];
+    const b = el.querySelector(".ms-badge"); if (b) b.remove();
+  } else {
+    lbl.textContent = n === 1 ? [...sel][0] : `${n} selecionado${n>1?"s":""}`;
+    let b = el.querySelector(".ms-badge");
+    if (!b) { b = document.createElement("span"); b.className = "ms-badge"; el.insertBefore(b, el.querySelector(".ms-arrow")); }
+    b.textContent = n;
+  }
+}
+
+// Toggle checkbox + estado ao clicar em item
+function bindListEvents(listId, ctx) {
+  const el = document.getElementById(listId);
+  el.addEventListener("change", e => {
+    if (e.target.type !== "checkbox") return;
+    const val = e.target.closest(".ms-item").querySelector("label").textContent;
+    const sel = getSelSet(ctx);
+    if (e.target.checked) sel.add(val); else sel.delete(val);
+    updateTriggerLabel(ctx);
+    onFilterChange(ctx);
+  });
+}
+
+function msSelAll(ctx) {
+  const {list} = getCtxIds(ctx);
+  const sel = getSelSet(ctx);
+  document.querySelectorAll("#" + list + " .ms-item").forEach(item => {
+    if (item.style.display === "none") return;
+    const lbl = item.querySelector("label").textContent;
+    sel.add(lbl);
+    item.querySelector("input").checked = true;
+  });
+  updateTriggerLabel(ctx);
+  onFilterChange(ctx);
+}
+
+function msClearAll(ctx) {
+  const {list} = getCtxIds(ctx);
+  const sel = getSelSet(ctx);
+  sel.clear();
+  document.querySelectorAll("#" + list + " input[type=checkbox]").forEach(cb => cb.checked = false);
+  updateTriggerLabel(ctx);
+  onFilterChange(ctx);
+}
+
+function onFilterChange(ctx) {
+  if (ctx === "mes" || ctx === "indgar") renderCharts();
+  else { TABS[ctx].page = 1; renderTab(ctx); }
+}
+
+// ─── ABAS DE OS ───────────────────────────────────────────────────────────────
+function toggleAlert(ctx) {
+  TABS[ctx].onlyAlert = !TABS[ctx].onlyAlert;
+  document.getElementById("pill-" + ctx).classList.toggle("on", TABS[ctx].onlyAlert);
+  TABS[ctx].page = 1;
+  renderTab(ctx);
+}
+
+function applyFilters(ctx) {
+  const tab = TABS[ctx];
+  const q = document.getElementById("q-" + ctx).value.toLowerCase();
+  let f = tab.src.filter(r => {
+    const mq = !q || tab.cols.some(c => String(r[c]).toLowerCase().includes(q));
+    const mg = tab.sel.size === 0 || tab.sel.has(r.tipo_garantia);
+    const ma = !tab.onlyAlert || r.tat > ALERT;
+    return mq && mg && ma;
+  });
+  const {k, d} = tab.sort;
+  f.sort((a, b) => typeof a[k] === "number" ? (a[k]-b[k])*d : String(a[k]).localeCompare(String(b[k]))*d);
+  return f;
+}
+
+function tatBadge(t) {
+  if (t > ALERT) return `<span class="tat-badge tat-over">${t}d</span>`;
+  if (t >= 13)   return `<span class="tat-badge tat-warn">${t}d</span>`;
+  return `<span class="tat-badge tat-ok">${t}d</span>`;
+}
+
+function renderTab(ctx) {
+  const f = applyFilters(ctx);
+  const tab = TABS[ctx];
+  const tot = f.length;
+  // Summary
+  const al = f.filter(r => r.tat > ALERT).length;
+  const avg = tot ? Math.round(f.reduce((s,r) => s+r.tat, 0)/tot) : 0;
+  const mx = tot ? Math.max(...f.map(r => r.tat)) : 0;
+  document.getElementById("sum-" + ctx).innerHTML = tot === 0
+    ? `<div class="scard blu"><div class="val">0</div><div class="lbl">OS encontradas</div></div>`
+    : `<div class="scard blu"><div class="val">${tot}</div><div class="lbl">OS em fila</div></div>
+       <div class="scard red"><div class="val">${al}</div><div class="lbl">⚠ Acima de ${ALERT} dias</div></div>
+       <div class="scard grn"><div class="val">${tot-al}</div><div class="lbl">Dentro do prazo</div></div>
+       <div class="scard ylw"><div class="val">${avg}d</div><div class="lbl">TAT médio</div></div>
+       <div class="scard red"><div class="val">${mx}d</div><div class="lbl">TAT máximo</div></div>`;
+  document.getElementById("info-" + ctx).textContent = `${tot} OS encontradas`;
+  // Table
+  const pages = Math.max(1, Math.ceil(tot/PAGE));
+  if (tab.page > pages) tab.page = 1;
+  const s = (tab.page-1)*PAGE;
+  const sl = f.slice(s, s+PAGE);
+  document.getElementById("tb-" + ctx).innerHTML = sl.length === 0
+    ? `<tr><td colspan="6" class="no-results">Nenhuma OS com os filtros aplicados.</td></tr>`
+    : sl.map(r => {
+      const cells = tab.cols.map(c => {
+        if (c === "os") return `<td><strong>${r.tat>ALERT?'<span class="pulse"></span>':""}${r.os}</strong></td>`;
+        if (c === "tat") return `<td>${tatBadge(r.tat)}</td>`;
+        return `<td>${r[c]||'<span style="color:var(--muted)">—</span>'}</td>`;
+      }).join("");
+      return `<tr class="${r.tat>ALERT?"row-alert":""}">${cells}</tr>`;
+    }).join("");
+  // Pagination
+  const pg = document.getElementById("pag-" + ctx);
+  if (pages <= 1) { pg.innerHTML = ""; return; }
+  let h = `<span class="pi">${s+1}–${Math.min(s+PAGE,tot)} de ${tot}</span>`;
+  for (let p = 1; p <= pages; p++) {
+    if (p===1||p===pages||Math.abs(p-tab.page)<=2)
+      h += `<button class="pb ${p===tab.page?"on":""}" onclick="goPage('${ctx}',${p})">${p}</button>`;
+    else if (Math.abs(p-tab.page)===3) h += `<span class="pi">…</span>`;
+  }
+  pg.innerHTML = h;
+}
+
+function goPage(ctx, p) { TABS[ctx].page = p; renderTab(ctx); }
+
+function sortTab(ctx, k) {
+  const tab = TABS[ctx];
+  if (tab.sort.k === k) tab.sort.d *= -1;
+  else { tab.sort.k = k; tab.sort.d = -1; }
+  tab.page = 1;
+  tab.cols.forEach(c => {
+    const th = document.getElementById(`th-${ctx}-${c}`);
+    if (!th) return;
+    th.classList.toggle("sorted", c === k);
+    th.querySelector("span").textContent = c===k ? (tab.sort.d===-1?"↓":"↑") : "↕";
+  });
+  renderTab(ctx);
+}
+
+// ─── INDICADORES ──────────────────────────────────────────────────────────────
+function getIndData() {
+  const meses = IND_STATE.selMes.size > 0 ? [...IND_STATE.selMes] : IND.meses;
+  const gars  = IND_STATE.selGar.size > 0 ? [...IND_STATE.selGar] : null;
+  const agg = {}; DESFECHOS.forEach(d => agg[d] = 0);
+  meses.forEach(m => {
+    if (!IND.data[m]) return;
+    Object.entries(IND.data[m]).forEach(([g, vals]) => {
+      if (gars && !gars.includes(g)) return;
+      DESFECHOS.forEach(d => agg[d] += vals[d]||0);
+    });
+  });
+  return agg;
+}
+
+function getIndLabel() {
+  const m = IND_STATE.selMes.size, g = IND_STATE.selGar.size;
+  return `${m===0?"todos os meses":m===1?[...IND_STATE.selMes][0]:m+" meses"} · ${g===0?"todas as garantias":g===1?[...IND_STATE.selGar][0]:g+" tipos"}`;
+}
+
+function renderCharts() {
+  const def = getIndData();
+  const total = Object.values(def).reduce((a,b) => a+b, 0);
+  const lbl = getIndLabel();
+  document.getElementById("ch-sub").textContent  = `${total.toLocaleString("pt-BR")} OS · ${lbl}`;
+  document.getElementById("ch-sub2").textContent = lbl;
+  document.getElementById("kpi-sub").textContent = `Indicadores · ${lbl}`;
+  document.getElementById("donut-tot").textContent = total.toLocaleString("pt-BR");
+  const entries = Object.entries(def).sort((a,b) => b[1]-a[1]);
+  // Donut
+  const svg = document.getElementById("donut-svg");
+  let start = -Math.PI/2, paths = "";
+  entries.forEach(([lbl, val]) => {
+    if (!val||!total) return;
+    const a = (val/total)*2*Math.PI, end = start+a;
+    const cx=75,cy=75,r=55;
+    const x1=cx+r*Math.cos(start),y1=cy+r*Math.sin(start);
+    const x2=cx+r*Math.cos(end),y2=cy+r*Math.sin(end);
+    paths += `<path d="M${x1},${y1} A${r},${r},0,${a>Math.PI?1:0},1,${x2},${y2}" fill="none" stroke="${CORES[lbl]||"#888"}" stroke-width="16" stroke-linecap="butt"/>`;
+    start = end;
+  });
+  svg.innerHTML = total ? paths : `<circle cx="75" cy="75" r="55" fill="none" stroke="var(--surface2)" stroke-width="16"/>`;
+  document.getElementById("donut-leg").innerHTML = entries.map(([lbl,val]) =>
+    `<div class="leg-row"><div class="leg-dot" style="background:${CORES[lbl]||"#888"}"></div>
+     <span class="leg-lbl">${lbl}</span><span class="leg-val">${val.toLocaleString("pt-BR")}</span>
+     <span class="leg-pct">${total?Math.round(val/total*100):0}%</span></div>`).join("");
+  const mx = Math.max(...Object.values(def));
+  document.getElementById("bar-chart").innerHTML = entries.map(([lbl,val]) =>
+    `<div class="bar-row"><span class="bar-label">${lbl}</span>
+     <div class="bar-track"><div class="bar-fill" style="width:${mx?Math.round(val/mx*100):0}%;background:${CORES[lbl]||"#888"}"></div></div>
+     <span class="bar-val">${val.toLocaleString("pt-BR")}</span>
+     <span class="bar-pct">${total?Math.round(val/total*100):0}%</span></div>`).join("");
+  const cons=def["CONSERTADO"]||0, troc=def["TROCA"]||0, canc=def["CANCELADA"]||0;
+  document.getElementById("kpi-grid").innerHTML = `
+    <div class="scard grn"><div class="val">${total?Math.round(cons/total*100):0}%</div><div class="lbl">Taxa de conserto</div></div>
+    <div class="scard blu"><div class="val">${total?Math.round(troc/total*100):0}%</div><div class="lbl">Taxa de troca</div></div>
+    <div class="scard red"><div class="val">${total?Math.round(canc/total*100):0}%</div><div class="lbl">Taxa de cancelamento</div></div>
+    <div class="scard ylw"><div class="val">${total.toLocaleString("pt-BR")}</div><div class="lbl">OS com desfecho</div></div>
+    <div class="scard" style="border-color:var(--border)"><div class="val" style="color:var(--teal)">${(def["SEM DEFEITO"]||0).toLocaleString("pt-BR")}</div><div class="lbl">Sem defeito</div></div>
+    <div class="scard" style="border-color:var(--border)"><div class="val" style="color:var(--purple)">${(def["LAUDO"]||0).toLocaleString("pt-BR")}</div><div class="lbl">Laudos emitidos</div></div>`;
+}
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+// Mostrar primeira aba
+showTab("panel-as");
+
+// Construir listas de garantia para cada aba de OS
+["as","aa","ad"].forEach(ctx => {
+  const src = TABS[ctx].src;
+  const gars = [...new Set(src.map(r => r.tipo_garantia).filter(Boolean))].sort();
+  buildMsList("list-" + ctx, gars);
+  bindListEvents("list-" + ctx, ctx);
+  renderTab(ctx);
+});
+
+// Construir listas de indicadores
+buildMsList("list-mes", IND.meses);
+bindListEvents("list-mes", "mes");
+buildMsList("list-indgar", IND.garantias);
+bindListEvents("list-indgar", "indgar");
+renderCharts();
+</script>
+</body>
+</html>
